@@ -1,0 +1,52 @@
+{
+  "appName": "Novatio EU FMD Alert Manager",
+  "login": "Login",
+  "logout": "Logout",
+  "username": "Username",
+  "password": "Password",
+  "email": "Email",
+  "submit": "Submit",
+  "cancel": "Cancel",
+  "save": "Save",
+  "delete": "Delete",
+  "edit": "Edit",
+  "add": "Add",
+  "close": "Close",
+  "confirm": "Confirm",
+  "search": "Search",
+  "filter": "Filter",
+  "export": "Export",
+  "refresh": "Refresh",
+  "loading": "Loading...",
+  "noData": "No data available",
+  "success": "Operation successful",
+  "error": "An error occurred",
+  "required": "This field is required",
+  "actions": "Actions",
+  "status": "Status",
+  "createdOn": "Created On",
+  "changedOn": "Changed On",
+  "role": "Role",
+  "market": "Market",
+  "selectAll": "Select All",
+  "itemsPerPage": "Items per page",
+  "nav": {
+    "dashboard": "Dashboard",
+    "alerts": "Alerts",
+    "markets": "Market Configuration",
+    "users": "Users",
+    "admin": "Admin",
+    "comingSoon": "Coming Soon"
+  },
+  "roles": {
+    "AlertHandler": "Alert Handler",
+    "AlertHandler_supervisor": "Supervisor",
+    "admin": "Admin"
+  },
+  "statuses": {
+    "Open": "Open",
+    "InProgress": "In Progress",
+    "Closed": "Closed",
+    "OnHold": "On Hold"
+  }
+}

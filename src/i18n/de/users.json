@@ -1,0 +1,17 @@
+{
+  "title": "Benutzerverwaltung",
+  "addUser": "Benutzer hinzufügen",
+  "editUser": "Benutzer bearbeiten",
+  "deleteUser": "Benutzer löschen",
+  "displayName": "Anzeigename",
+  "assignRole": "Rolle zuweisen",
+  "assignMarkets": "Märkte zuweisen",
+  "resetPassword": "Passwort zurücksetzen",
+  "noUsers": "Keine Benutzer gefunden",
+  "confirmDelete": "Möchten Sie diesen Benutzer wirklich löschen?",
+  "createSuccess": "Benutzer erfolgreich erstellt",
+  "updateSuccess": "Benutzer erfolgreich aktualisiert",
+  "deleteSuccess": "Benutzer erfolgreich gelöscht",
+  "resetSuccess": "Link zum Zurücksetzen des Passworts gesendet",
+  "error": "Benutzervorgang fehlgeschlagen"
+}

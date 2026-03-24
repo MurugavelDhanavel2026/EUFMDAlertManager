@@ -1,0 +1,16 @@
+{
+  "title": "Marktkonfiguration",
+  "addMarket": "Markt hinzufügen",
+  "editMarket": "Markt bearbeiten",
+  "deleteMarket": "Markt löschen",
+  "marketName": "Marktname",
+  "marketCode": "Marktcode",
+  "assignUsers": "Benutzer zuweisen",
+  "assignedUsers": "Zugewiesene Benutzer",
+  "noMarkets": "Keine Märkte konfiguriert",
+  "confirmDelete": "Möchten Sie diesen Markt wirklich löschen?",
+  "createSuccess": "Markt erfolgreich erstellt",
+  "updateSuccess": "Markt erfolgreich aktualisiert",
+  "deleteSuccess": "Markt erfolgreich gelöscht",
+  "error": "Marktvorgang fehlgeschlagen"
+}

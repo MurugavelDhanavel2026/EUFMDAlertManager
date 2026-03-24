@@ -1,0 +1,46 @@
+{
+  "title": "Alarme",
+  "fetchAlerts": "Alarme abrufen",
+  "fetchingAlerts": "Alarme werden abgerufen...",
+  "respondNMVS": "An NMVS antworten",
+  "rootCauseAnalysis": "Ursachenanalyse starten",
+  "columns": {
+    "alertId": "Alarm-ID",
+    "alertTimestamp": "Zeitstempel",
+    "status": "Status",
+    "errorCode": "Fehlercode",
+    "targetMarket": "Zielmarkt",
+    "alertMessage": "Alarmmeldung",
+    "gtin": "GTIN",
+    "expiryDate": "Verfallsdatum",
+    "serialNumber": "Seriennummer",
+    "batchName": "Charge",
+    "messageGUID": "Nachrichten-GUID",
+    "rootCause": "Ursache / Kommentare",
+    "assignedUser": "Zugewiesener Benutzer"
+  },
+  "bulk": {
+    "selected": "{{count}} ausgewählt",
+    "closeSelected": "Auswahl schließen",
+    "sendResponse": "Antwort an NMVS senden",
+    "bulkUpdate": "Massenaktualisierung",
+    "pendingApproval": "Wartet auf Genehmigung",
+    "approved": "Genehmigt",
+    "rejected": "Abgelehnt"
+  },
+  "nmvsDialog": {
+    "title": "An NMVS antworten",
+    "emailTo": "E-Mail an",
+    "subject": "Betreff",
+    "body": "E-Mail-Text",
+    "send": "Antwort senden",
+    "success": "Antwort erfolgreich gesendet",
+    "error": "Antwort konnte nicht gesendet werden"
+  },
+  "fetchSuccess": "Alarme erfolgreich abgerufen",
+  "fetchError": "Alarme konnten nicht abgerufen werden",
+  "updateSuccess": "Alarm erfolgreich aktualisiert",
+  "updateError": "Alarm konnte nicht aktualisiert werden",
+  "rootCauseSuccess": "Ursachenanalyse gestartet",
+  "rootCauseError": "Ursachenanalyse konnte nicht gestartet werden"
+}

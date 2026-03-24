@@ -1,0 +1,37 @@
+{
+  "title": "Dashboard",
+  "totalAlerts": "Gesamtalarme",
+  "openAlerts": "Offene Alarme",
+  "closedAlerts": "Geschlossene Alarme",
+  "uniqueGTINs": "Eindeutige GTINs",
+  "filters": {
+    "dateRange": "Datumsbereich",
+    "from": "Von",
+    "to": "Bis",
+    "month": "Monat",
+    "year": "Jahr",
+    "status": "Status",
+    "market": "Markt",
+    "batch": "Charge",
+    "allStatuses": "Alle Status",
+    "allMarkets": "Alle Märkte",
+    "allBatches": "Alle Chargen"
+  },
+  "export": {
+    "csv": "CSV exportieren",
+    "pdf": "PDF exportieren",
+    "share": "Per E-Mail teilen",
+    "allAlerts": "Gesamtbericht",
+    "dateWise": "Datumsbericht",
+    "monthWise": "Monatsbericht",
+    "statusWise": "Statusbericht"
+  },
+  "shareDialog": {
+    "title": "Dashboard teilen",
+    "emailLabel": "E-Mail-Adresse",
+    "emailPlaceholder": "E-Mail-Adresse eingeben",
+    "send": "Senden",
+    "success": "Dashboard erfolgreich geteilt",
+    "error": "Dashboard konnte nicht geteilt werden"
+  }
+}

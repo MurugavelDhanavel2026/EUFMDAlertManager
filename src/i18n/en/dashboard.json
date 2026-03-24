@@ -1,0 +1,37 @@
+{
+  "title": "Dashboard",
+  "totalAlerts": "Total Alerts",
+  "openAlerts": "Open Alerts",
+  "closedAlerts": "Closed Alerts",
+  "uniqueGTINs": "Unique GTINs",
+  "filters": {
+    "dateRange": "Date Range",
+    "from": "From",
+    "to": "To",
+    "month": "Month",
+    "year": "Year",
+    "status": "Status",
+    "market": "Market",
+    "batch": "Batch",
+    "allStatuses": "All Statuses",
+    "allMarkets": "All Markets",
+    "allBatches": "All Batches"
+  },
+  "export": {
+    "csv": "Export CSV",
+    "pdf": "Export PDF",
+    "share": "Share via Email",
+    "allAlerts": "All Alerts Report",
+    "dateWise": "Date-wise Report",
+    "monthWise": "Month-wise Report",
+    "statusWise": "Status-wise Report"
+  },
+  "shareDialog": {
+    "title": "Share Dashboard",
+    "emailLabel": "Email Address",
+    "emailPlaceholder": "Enter email address",
+    "send": "Send",
+    "success": "Dashboard shared successfully",
+    "error": "Failed to share dashboard"
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "title": "Admin Settings",
+  "dbConfig": {
+    "title": "Database Configuration",
+    "supabaseUrl": "Supabase URL",
+    "supabaseKey": "Supabase Anon Key",
+    "dbName": "Database Name",
+    "save": "Save Configuration",
+    "success": "Database configuration saved",
+    "error": "Failed to save database configuration"
+  },
+  "smtpConfig": {
+    "title": "SMTP Configuration",
+    "host": "SMTP Host",
+    "port": "SMTP Port",
+    "user": "SMTP Username",
+    "password": "SMTP Password",
+    "fromEmail": "From Email",
+    "save": "Save SMTP Settings",
+    "success": "SMTP configuration saved",
+    "error": "Failed to save SMTP configuration"
+  },
+  "uipathConfig": {
+    "title": "UiPath Configuration",
+    "fetchEndpoint": "Fetch Alerts Endpoint",
+    "rootCauseEndpoint": "Root Cause Analysis Endpoint",
+    "apiKey": "API Key",
+    "enabled": "Enabled",
+    "save": "Save UiPath Settings",
+    "success": "UiPath configuration saved",
+    "error": "Failed to save UiPath configuration"
+  }
+}

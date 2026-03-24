@@ -1,0 +1,46 @@
+{
+  "title": "Alerts",
+  "fetchAlerts": "Fetch Alerts",
+  "fetchingAlerts": "Fetching alerts...",
+  "respondNMVS": "Respond to NMVS",
+  "rootCauseAnalysis": "Run Root Cause Analysis",
+  "columns": {
+    "alertId": "Alert ID",
+    "alertTimestamp": "Timestamp",
+    "status": "Status",
+    "errorCode": "Error Code",
+    "targetMarket": "Target Market",
+    "alertMessage": "Alert Message",
+    "gtin": "GTIN",
+    "expiryDate": "Expiry Date",
+    "serialNumber": "Serial Number",
+    "batchName": "Batch",
+    "messageGUID": "Message GUID",
+    "rootCause": "Root Cause / Comments",
+    "assignedUser": "Assigned User"
+  },
+  "bulk": {
+    "selected": "{{count}} selected",
+    "closeSelected": "Close Selected",
+    "sendResponse": "Send Response to NMVS",
+    "bulkUpdate": "Bulk Update",
+    "pendingApproval": "Pending Supervisor Approval",
+    "approved": "Approved",
+    "rejected": "Rejected"
+  },
+  "nmvsDialog": {
+    "title": "Respond to NMVS",
+    "emailTo": "Send to Email",
+    "subject": "Subject",
+    "body": "Email Body",
+    "send": "Send Response",
+    "success": "Response sent successfully",
+    "error": "Failed to send response"
+  },
+  "fetchSuccess": "Alerts fetched successfully",
+  "fetchError": "Failed to fetch alerts",
+  "updateSuccess": "Alert updated successfully",
+  "updateError": "Failed to update alert",
+  "rootCauseSuccess": "Root cause analysis triggered",
+  "rootCauseError": "Failed to trigger root cause analysis"
+}

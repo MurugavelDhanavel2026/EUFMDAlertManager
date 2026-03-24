@@ -1,0 +1,33 @@
+{
+  "title": "Admin-Einstellungen",
+  "dbConfig": {
+    "title": "Datenbankkonfiguration",
+    "supabaseUrl": "Supabase-URL",
+    "supabaseKey": "Supabase Anon-Schlüssel",
+    "dbName": "Datenbankname",
+    "save": "Konfiguration speichern",
+    "success": "Datenbankkonfiguration gespeichert",
+    "error": "Datenbankkonfiguration konnte nicht gespeichert werden"
+  },
+  "smtpConfig": {
+    "title": "SMTP-Konfiguration",
+    "host": "SMTP-Host",
+    "port": "SMTP-Port",
+    "user": "SMTP-Benutzername",
+    "password": "SMTP-Passwort",
+    "fromEmail": "Absender-E-Mail",
+    "save": "SMTP-Einstellungen speichern",
+    "success": "SMTP-Konfiguration gespeichert",
+    "error": "SMTP-Konfiguration konnte nicht gespeichert werden"
+  },
+  "uipathConfig": {
+    "title": "UiPath-Konfiguration",
+    "fetchEndpoint": "Alarme-Abruf-Endpunkt",
+    "rootCauseEndpoint": "Ursachenanalyse-Endpunkt",
+    "apiKey": "API-Schlüssel",
+    "enabled": "Aktiviert",
+    "save": "UiPath-Einstellungen speichern",
+    "success": "UiPath-Konfiguration gespeichert",
+    "error": "UiPath-Konfiguration konnte nicht gespeichert werden"
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "appName": "Novatio EU FMD Alarm-Manager",
+  "login": "Anmelden",
+  "logout": "Abmelden",
+  "username": "Benutzername",
+  "password": "Passwort",
+  "email": "E-Mail",
+  "submit": "Absenden",
+  "cancel": "Abbrechen",
+  "save": "Speichern",
+  "delete": "Löschen",
+  "edit": "Bearbeiten",
+  "add": "Hinzufügen",
+  "close": "Schließen",
+  "confirm": "Bestätigen",
+  "search": "Suchen",
+  "filter": "Filtern",
+  "export": "Exportieren",
+  "refresh": "Aktualisieren",
+  "loading": "Laden...",
+  "noData": "Keine Daten verfügbar",
+  "success": "Vorgang erfolgreich",
+  "error": "Ein Fehler ist aufgetreten",
+  "required": "Dieses Feld ist erforderlich",
+  "actions": "Aktionen",
+  "status": "Status",
+  "createdOn": "Erstellt am",
+  "changedOn": "Geändert am",
+  "role": "Rolle",
+  "market": "Markt",
+  "selectAll": "Alle auswählen",
+  "itemsPerPage": "Einträge pro Seite",
+  "nav": {
+    "dashboard": "Dashboard",
+    "alerts": "Alarme",
+    "markets": "Marktkonfiguration",
+    "users": "Benutzer",
+    "admin": "Administration",
+    "comingSoon": "Demnächst"
+  },
+  "roles": {
+    "AlertHandler": "Alarm-Bearbeiter",
+    "AlertHandler_supervisor": "Supervisor",
+    "admin": "Administrator"
+  },
+  "statuses": {
+    "Open": "Offen",
+    "InProgress": "In Bearbeitung",
+    "Closed": "Geschlossen",
+    "OnHold": "Wartend"
+  }
+}
