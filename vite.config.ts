@@ -57,6 +57,20 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+          'vendor-mui': ['@mui/material', '@mui/icons-material'],
+          'vendor-supabase': ['@supabase/supabase-js'],
+          'vendor-query': ['@tanstack/react-query'],
+          'vendor-i18n': ['i18next', 'react-i18next', 'i18next-browser-languagedetector'],
+          'vendor-export': ['jspdf', 'jspdf-autotable', 'papaparse'],
+        },
+      },
+    },
+  },
   server: {
     port: 3000,
     open: true,
