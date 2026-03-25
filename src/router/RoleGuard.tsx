@@ -1,7 +1,7 @@
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import type { AppRole } from '../config/constants';
-import { Box, CircularProgress } from '@mui/material';
+import { Box, CircularProgress, Typography } from '@mui/material';
 
 interface RoleGuardProps {
   children: React.ReactNode;
@@ -13,8 +13,11 @@ export default function RoleGuard({ children, allowedRoles }: RoleGuardProps) {
 
   if (isLoading) {
     return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="100vh">
-        <CircularProgress />
+      <Box display="flex" flexDirection="column" justifyContent="center" alignItems="center" minHeight="60vh" gap={2}>
+        <CircularProgress size={32} />
+        <Typography variant="body2" color="text.secondary">
+          Loading...
+        </Typography>
       </Box>
     );
   }
