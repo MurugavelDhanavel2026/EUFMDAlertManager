@@ -173,14 +173,23 @@ export default function AlertsPage() {
   };
 
   const handleStatusChange = async (alertId: string, newStatus: string) => {
+    // Optimistic update
+    setAlerts((prev) =>
+      prev.map((a) => (a.id === alertId ? { ...a, status: newStatus as Alert['status'] } : a))
+    );
     try {
-      const { error } = await supabase
+      const { error, data } = await supabase
         .from('alerts')
         .update({ status: newStatus })
-        .eq('id', alertId);
+        .eq('id', alertId)
+        .select();
       if (error) throw error;
+      if (!data || data.length === 0) {
+        enqueueSnackbar('Update blocked by permissions. Check your role/market assignment.', { variant: 'warning' });
+        fetchAlerts();
+        return;
+      }
       enqueueSnackbar(t('updateSuccess'), { variant: 'success' });
-      fetchAlerts();
     } catch {
       enqueueSnackbar(t('updateError'), { variant: 'error' });
     }
@@ -209,16 +218,27 @@ export default function AlertsPage() {
   };
 
   const handleAssignedUserChange = async (alertId: string, userId: string) => {
+    // Optimistic update
+    setAlerts((prev) =>
+      prev.map((a) => (a.id === alertId ? { ...a, assigned_user: userId || null } : a))
+    );
     try {
-      const { error } = await supabase
+      const { error, data } = await supabase
         .from('alerts')
         .update({ assigned_user: userId || null })
-        .eq('id', alertId);
+        .eq('id', alertId)
+        .select();
       if (error) throw error;
+      if (!data || data.length === 0) {
+        enqueueSnackbar('Update blocked by permissions. Check your role/market assignment.', { variant: 'warning' });
+        fetchAlerts(); // Revert optimistic update
+        return;
+      }
       enqueueSnackbar(t('updateSuccess'), { variant: 'success' });
-      fetchAlerts();
-    } catch {
+    } catch (err) {
+      console.error('Assign user error:', err);
       enqueueSnackbar(t('updateError'), { variant: 'error' });
+      fetchAlerts(); // Revert optimistic update
     }
   };
 
