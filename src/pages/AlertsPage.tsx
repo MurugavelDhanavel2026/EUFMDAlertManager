@@ -453,19 +453,22 @@ export default function AlertsPage() {
                 <TableCell>{t('columns.status')}</TableCell>
                 <TableCell>{t('columns.errorCode')}</TableCell>
                 <TableCell>{t('columns.targetMarket')}</TableCell>
+                <TableCell>{t('columns.alertMessage')}</TableCell>
                 <TableCell>{t('columns.gtin')}</TableCell>
                 <TableCell>{t('columns.batchName')}</TableCell>
                 <TableCell>{t('columns.serialNumber')}</TableCell>
                 <TableCell>{t('columns.expiryDate')}</TableCell>
                 <TableCell sx={{ minWidth: 250 }}>{t('columns.rootCause')}</TableCell>
                 <TableCell>{t('columns.assignedUser')}</TableCell>
+                <TableCell>{tc('createdOn')}</TableCell>
+                <TableCell>{tc('changedOn')}</TableCell>
                 <TableCell>{tc('actions')}</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {alerts.length === 0 && !isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={13} align="center" sx={{ py: 4 }}>
+                  <TableCell colSpan={16} align="center" sx={{ py: 4 }}>
                     <Typography color="text.secondary">{tc('noData')}</Typography>
                   </TableCell>
                 </TableRow>
@@ -510,6 +513,9 @@ export default function AlertsPage() {
                     <TableCell>{alert.error_code || '-'}</TableCell>
                     <TableCell>
                       <Chip label={alert.target_market} size="small" variant="outlined" />
+                    </TableCell>
+                    <TableCell sx={{ fontSize: '0.8rem', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {alert.alert_message || '-'}
                     </TableCell>
                     <TableCell sx={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>
                       {alert.gtin || '-'}
@@ -570,6 +576,16 @@ export default function AlertsPage() {
                           ))}
                         </Select>
                       </FormControl>
+                    </TableCell>
+                    <TableCell sx={{ fontSize: '0.8rem', whiteSpace: 'nowrap' }}>
+                      {alert.created_on
+                        ? dayjs(alert.created_on).format('YYYY-MM-DD HH:mm')
+                        : '-'}
+                    </TableCell>
+                    <TableCell sx={{ fontSize: '0.8rem', whiteSpace: 'nowrap' }}>
+                      {alert.changed_on
+                        ? dayjs(alert.changed_on).format('YYYY-MM-DD HH:mm')
+                        : '-'}
                     </TableCell>
                     <TableCell>
                       <Tooltip title={t('respondNMVS')}>
