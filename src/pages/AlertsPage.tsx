@@ -76,6 +76,9 @@ export default function AlertsPage() {
     alert: null,
   });
   const [nmvsEmail, setNmvsEmail] = useState('');
+  const [emailTemplate, setEmailTemplate] = useState<{ subject: string; body: string }>({ subject: '', body: '' });
+  const [graphConfig, setGraphConfig] = useState<{ tenant_id: string; app_id: string; client_secret: string; sender_email: string } | null>(null);
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
 
   const isAlertHandler = user?.role === 'AlertHandler';
 
@@ -103,6 +106,15 @@ export default function AlertsPage() {
         .select('id, username, display_name, role, created_at')
         .in('role', ['AlertHandler', 'AlertHandler_supervisor']);
       if (users) setAvailableUsers(users);
+
+      // Fetch email settings (using service role via separate query for admin settings)
+      const { data: settings } = await supabase.from('app_settings').select('key, value').in('key', ['email_template', 'graph_api_config']);
+      if (settings) {
+        for (const row of settings) {
+          if (row.key === 'email_template') setEmailTemplate(row.value as { subject: string; body: string });
+          if (row.key === 'graph_api_config') setGraphConfig(row.value as { tenant_id: string; app_id: string; client_secret: string; sender_email: string });
+        }
+      }
     };
     load();
   }, [user, isAlertHandler]);
@@ -285,27 +297,82 @@ export default function AlertsPage() {
     }
   };
 
+  const replacePlaceholders = (template: string, alert: Alert): string => {
+    let result = template;
+    const fields: Record<string, string> = {
+      alert_id: alert.alert_id,
+      alert_timestamp: alert.alert_timestamp ? dayjs(alert.alert_timestamp).format('YYYY-MM-DD HH:mm') : 'N/A',
+      status: alert.status,
+      error_code: alert.error_code || 'N/A',
+      target_market: alert.target_market,
+      alert_message: alert.alert_message || 'N/A',
+      gtin: alert.gtin || 'N/A',
+      expiry_date: alert.expiry_date ? dayjs(alert.expiry_date).format('YYYY-MM-DD') : 'N/A',
+      serial_number: alert.serial_number || 'N/A',
+      batch_name: alert.batch_name || 'N/A',
+      message_guid: alert.message_guid || 'N/A',
+      root_cause: alert.root_cause || 'N/A',
+      created_on: alert.created_on ? dayjs(alert.created_on).format('YYYY-MM-DD HH:mm') : 'N/A',
+      changed_on: alert.changed_on ? dayjs(alert.changed_on).format('YYYY-MM-DD HH:mm') : 'N/A',
+    };
+    for (const [key, value] of Object.entries(fields)) {
+      result = result.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), value);
+    }
+    return result;
+  };
+
+  const getEmailSubject = (alert: Alert): string => {
+    if (emailTemplate.subject) return replacePlaceholders(emailTemplate.subject, alert);
+    return `NMVS Response - Alert ${alert.alert_id} - ${alert.target_market}`;
+  };
+
+  const getEmailBody = (alert: Alert): string => {
+    if (emailTemplate.body) return replacePlaceholders(emailTemplate.body, alert);
+    return `<h3>Alert Response</h3>
+      <p><strong>Alert ID:</strong> ${alert.alert_id}</p>
+      <p><strong>GTIN:</strong> ${alert.gtin || 'N/A'}</p>
+      <p><strong>Serial Number:</strong> ${alert.serial_number || 'N/A'}</p>
+      <p><strong>Batch:</strong> ${alert.batch_name || 'N/A'}</p>
+      <p><strong>Root Cause:</strong> ${alert.root_cause || 'N/A'}</p>
+      <p><strong>Market:</strong> ${alert.target_market}</p>`;
+  };
+
   const handleRespondNMVS = async () => {
     if (!nmvsDialog.alert) return;
+    setIsSendingEmail(true);
     try {
-      await supabase.functions.invoke('send-email', {
-        body: {
+      const alert = nmvsDialog.alert;
+      const subject = getEmailSubject(alert);
+      const body = getEmailBody(alert);
+
+      if (!graphConfig?.tenant_id || !graphConfig?.app_id || !graphConfig?.client_secret || !graphConfig?.sender_email) {
+        enqueueSnackbar('Graph API not configured. Please set up in Admin > Microsoft Graph API settings.', { variant: 'warning' });
+        setIsSendingEmail(false);
+        return;
+      }
+
+      const res = await fetch('/api/send-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           to: nmvsEmail,
-          subject: `Response for Alert ID- ${nmvsDialog.alert.alert_id}`,
-          html: `<h3>Alert Response</h3>
-            <p><strong>Alert ID:</strong> ${nmvsDialog.alert.alert_id}</p>
-            <p><strong>GTIN:</strong> ${nmvsDialog.alert.gtin || 'N/A'}</p>
-            <p><strong>Serial Number:</strong> ${nmvsDialog.alert.serial_number || 'N/A'}</p>
-            <p><strong>Batch:</strong> ${nmvsDialog.alert.batch_name || 'N/A'}</p>
-            <p><strong>Root Cause:</strong> ${nmvsDialog.alert.root_cause || 'N/A'}</p>
-            <p><strong>Market:</strong> ${nmvsDialog.alert.target_market}</p>`,
-        },
+          subject,
+          body,
+          graphConfig,
+        }),
       });
+
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || 'Failed to send email');
+
       enqueueSnackbar(t('nmvsDialog.success'), { variant: 'success' });
       setNmvsDialog({ open: false, alert: null });
       setNmvsEmail('');
-    } catch {
-      enqueueSnackbar(t('nmvsDialog.error'), { variant: 'error' });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : t('nmvsDialog.error');
+      enqueueSnackbar(message, { variant: 'error' });
+    } finally {
+      setIsSendingEmail(false);
     }
   };
 
@@ -625,36 +692,55 @@ export default function AlertsPage() {
       <Dialog
         open={nmvsDialog.open}
         onClose={() => setNmvsDialog({ open: false, alert: null })}
-        maxWidth="sm"
+        maxWidth="md"
         fullWidth
       >
         <DialogTitle>{t('nmvsDialog.title')}</DialogTitle>
         <DialogContent>
           <Typography variant="body2" color="text.secondary" mb={2}>
-            Alert ID: {nmvsDialog.alert?.alert_id}
+            Alert ID: {nmvsDialog.alert?.alert_id} | Market: {nmvsDialog.alert?.target_market}
           </Typography>
+
+          {!graphConfig?.tenant_id && (
+            <Box sx={{ bgcolor: 'warning.light', color: 'warning.dark', p: 1.5, borderRadius: 1, mb: 2, fontSize: '0.85rem' }}>
+              Graph API not configured. Go to Admin &gt; Microsoft Graph API to set up email sending.
+            </Box>
+          )}
+
           <TextField
             fullWidth
             label={t('nmvsDialog.emailTo')}
             type="email"
             value={nmvsEmail}
             onChange={(e) => setNmvsEmail(e.target.value)}
+            placeholder="recipient@example.com"
+            helperText="Separate multiple emails with commas"
             sx={{ mb: 2 }}
           />
           <TextField
             fullWidth
             label={t('nmvsDialog.subject')}
-            value={`Response for Alert ID- ${nmvsDialog.alert?.alert_id || ''}`}
+            value={nmvsDialog.alert ? getEmailSubject(nmvsDialog.alert) : ''}
             slotProps={{ input: { readOnly: true } }}
             sx={{ mb: 2 }}
           />
-          <TextField
-            fullWidth
-            label={t('nmvsDialog.body')}
-            multiline
-            rows={4}
-            value={nmvsDialog.alert?.root_cause || 'No root cause determined yet.'}
-            slotProps={{ input: { readOnly: true } }}
+          <Typography variant="subtitle2" color="text.secondary" mb={0.5}>
+            Email Body Preview:
+          </Typography>
+          <Box
+            sx={{
+              border: '1px solid',
+              borderColor: 'divider',
+              borderRadius: 1,
+              p: 2,
+              maxHeight: 300,
+              overflow: 'auto',
+              bgcolor: 'grey.50',
+              mb: 1,
+            }}
+            dangerouslySetInnerHTML={{
+              __html: nmvsDialog.alert ? getEmailBody(nmvsDialog.alert) : '',
+            }}
           />
         </DialogContent>
         <DialogActions>
@@ -663,9 +749,9 @@ export default function AlertsPage() {
             variant="contained"
             startIcon={<SendIcon />}
             onClick={handleRespondNMVS}
-            disabled={!nmvsEmail}
+            disabled={!nmvsEmail || isSendingEmail || !graphConfig?.tenant_id}
           >
-            {t('nmvsDialog.send')}
+            {isSendingEmail ? 'Sending...' : t('nmvsDialog.send')}
           </Button>
         </DialogActions>
       </Dialog>
