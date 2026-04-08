@@ -36,9 +36,18 @@ interface EmailTemplate {
   body: string;
 }
 
+interface UiPathFetchConfig {
+  invoke_url: string;
+  personal_access_token: string;
+  enabled: boolean;
+}
+
 interface UiPathConfig {
-  endpoint: string;
-  api_key: string;
+  base_url: string;
+  client_id: string;
+  client_secret: string;
+  release_key: string;
+  folder_id: string;
   enabled: boolean;
 }
 
@@ -107,15 +116,18 @@ export default function AdminPage() {
     body: '',
   });
 
-  const [uipathFetch, setUipathFetch] = useState<UiPathConfig>({
-    endpoint: '',
-    api_key: '',
+  const [uipathFetch, setUipathFetch] = useState<UiPathFetchConfig>({
+    invoke_url: '',
+    personal_access_token: '',
     enabled: false,
   });
 
   const [uipathRootCause, setUipathRootCause] = useState<UiPathConfig>({
-    endpoint: '',
-    api_key: '',
+    base_url: '',
+    client_id: '',
+    client_secret: '',
+    release_key: '',
+    folder_id: '',
     enabled: false,
   });
 
@@ -139,7 +151,7 @@ export default function AdminPage() {
               setEmailTemplate(row.value as EmailTemplate);
               break;
             case 'uipath_fetch_alerts':
-              setUipathFetch(row.value as UiPathConfig);
+              setUipathFetch(row.value as UiPathFetchConfig);
               break;
             case 'uipath_root_cause':
               setUipathRootCause(row.value as UiPathConfig);
@@ -388,24 +400,33 @@ export default function AdminPage() {
         {/* UiPath Fetch Alerts */}
         <Grid size={{ xs: 12, md: 6 }}>
           <Card>
-            <CardHeader title={`${t('uipathConfig.title')} - Fetch Alerts`} />
+            <CardHeader
+              title={`${t('uipathConfig.title')} - Fetch Alerts`}
+              subheader="Configure UiPath Orchestrator API for fetching alerts"
+            />
             <Divider />
             <CardContent>
+              <Alert severity="info" sx={{ mb: 2 }}>
+                Set up an API Trigger in UiPath Maestro and generate a Personal Access Token for authentication.
+              </Alert>
               <TextField
                 fullWidth
                 size="small"
-                label={t('uipathConfig.fetchEndpoint')}
-                value={uipathFetch.endpoint}
-                onChange={(e) => setUipathFetch((p) => ({ ...p, endpoint: e.target.value }))}
+                label={t('uipathConfig.invokeUrl')}
+                value={uipathFetch.invoke_url}
+                onChange={(e) => setUipathFetch((p) => ({ ...p, invoke_url: e.target.value }))}
+                placeholder="https://cloud.uipath.com/org/tenant/orchestrator_/t/<trigger-id>/ProcessName"
+                helperText="API Trigger Invoke URL from UiPath Maestro"
                 sx={{ mb: 2 }}
               />
               <TextField
                 fullWidth
                 size="small"
-                label={t('uipathConfig.apiKey')}
+                label={t('uipathConfig.personalAccessToken')}
                 type="password"
-                value={uipathFetch.api_key}
-                onChange={(e) => setUipathFetch((p) => ({ ...p, api_key: e.target.value }))}
+                value={uipathFetch.personal_access_token}
+                onChange={(e) => setUipathFetch((p) => ({ ...p, personal_access_token: e.target.value }))}
+                helperText="Personal Access Token (PAT) from UiPath Automation Cloud"
                 sx={{ mb: 2 }}
               />
               <FormControlLabel
@@ -441,24 +462,61 @@ export default function AdminPage() {
         {/* UiPath Root Cause */}
         <Grid size={{ xs: 12, md: 6 }}>
           <Card>
-            <CardHeader title={`${t('uipathConfig.title')} - Root Cause Analysis`} />
+            <CardHeader
+              title={`${t('uipathConfig.title')} - Root Cause Analysis`}
+              subheader="Configure UiPath Orchestrator API for root cause analysis"
+            />
             <Divider />
             <CardContent>
+              <Alert severity="info" sx={{ mb: 2 }}>
+                Register an External Application in UiPath Automation Cloud with <strong>OR.Jobs</strong> and <strong>OR.Execution</strong> scopes.
+              </Alert>
               <TextField
                 fullWidth
                 size="small"
-                label={t('uipathConfig.rootCauseEndpoint')}
-                value={uipathRootCause.endpoint}
-                onChange={(e) => setUipathRootCause((p) => ({ ...p, endpoint: e.target.value }))}
+                label={t('uipathConfig.baseUrl')}
+                value={uipathRootCause.base_url}
+                onChange={(e) => setUipathRootCause((p) => ({ ...p, base_url: e.target.value }))}
+                placeholder="https://cloud.uipath.com/orgName/tenantName"
+                helperText="Your UiPath Automation Cloud base URL"
                 sx={{ mb: 2 }}
               />
               <TextField
                 fullWidth
                 size="small"
-                label={t('uipathConfig.apiKey')}
+                label={t('uipathConfig.clientId')}
+                value={uipathRootCause.client_id}
+                onChange={(e) => setUipathRootCause((p) => ({ ...p, client_id: e.target.value }))}
+                placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                sx={{ mb: 2 }}
+              />
+              <TextField
+                fullWidth
+                size="small"
+                label={t('uipathConfig.clientSecret')}
                 type="password"
-                value={uipathRootCause.api_key}
-                onChange={(e) => setUipathRootCause((p) => ({ ...p, api_key: e.target.value }))}
+                value={uipathRootCause.client_secret}
+                onChange={(e) => setUipathRootCause((p) => ({ ...p, client_secret: e.target.value }))}
+                sx={{ mb: 2 }}
+              />
+              <TextField
+                fullWidth
+                size="small"
+                label={t('uipathConfig.releaseKey')}
+                value={uipathRootCause.release_key}
+                onChange={(e) => setUipathRootCause((p) => ({ ...p, release_key: e.target.value }))}
+                placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                helperText="Process release key from Orchestrator"
+                sx={{ mb: 2 }}
+              />
+              <TextField
+                fullWidth
+                size="small"
+                label={t('uipathConfig.folderId')}
+                value={uipathRootCause.folder_id}
+                onChange={(e) => setUipathRootCause((p) => ({ ...p, folder_id: e.target.value }))}
+                placeholder="123456"
+                helperText="Organization Unit / Folder ID"
                 sx={{ mb: 2 }}
               />
               <FormControlLabel

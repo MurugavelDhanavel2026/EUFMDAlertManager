@@ -37,6 +37,9 @@
     "success": "Response sent successfully",
     "error": "Failed to send response"
   },
+  "uipathNotConfigured": "UiPath is not configured or disabled. Please set up in Admin settings.",
+  "jobStarting": "Starting UiPath process...",
+  "jobStarted": "UiPath process running. Waiting for completion...",
   "fetchSuccess": "Alerts fetched successfully",
   "fetchError": "Failed to fetch alerts",
   "updateSuccess": "Alert updated successfully",

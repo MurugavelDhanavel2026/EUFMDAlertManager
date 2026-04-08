@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Box,
   Typography,
@@ -35,6 +35,7 @@ import {
   CloudDownload as FetchIcon,
   Psychology as RootCauseIcon,
   Save as SaveIcon,
+  Sync as SyncIcon,
 } from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
 import { useSnackbar } from 'notistack';
@@ -78,7 +79,9 @@ export default function AlertsPage() {
   const [nmvsEmail, setNmvsEmail] = useState('');
   const [emailTemplate, setEmailTemplate] = useState<{ subject: string; body: string }>({ subject: '', body: '' });
   const [graphConfig, setGraphConfig] = useState<{ tenant_id: string; app_id: string; client_secret: string; sender_email: string } | null>(null);
+  const [uipathFetchConfig, setUipathFetchConfig] = useState<{ invoke_url: string; personal_access_token: string; enabled: boolean } | null>(null);
   const [isSendingEmail, setIsSendingEmail] = useState(false);
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const isAlertHandler = user?.role === 'AlertHandler';
 
@@ -107,12 +110,13 @@ export default function AlertsPage() {
         .in('role', ['AlertHandler', 'AlertHandler_supervisor']);
       if (users) setAvailableUsers(users);
 
-      // Fetch email settings (using service role via separate query for admin settings)
-      const { data: settings } = await supabase.from('app_settings').select('key, value').in('key', ['email_template', 'graph_api_config']);
+      // Fetch email settings and UiPath config
+      const { data: settings } = await supabase.from('app_settings').select('key, value').in('key', ['email_template', 'graph_api_config', 'uipath_fetch_alerts']);
       if (settings) {
         for (const row of settings) {
           if (row.key === 'email_template') setEmailTemplate(row.value as { subject: string; body: string });
           if (row.key === 'graph_api_config') setGraphConfig(row.value as { tenant_id: string; app_id: string; client_secret: string; sender_email: string });
+          if (row.key === 'uipath_fetch_alerts') setUipathFetchConfig(row.value as { invoke_url: string; personal_access_token: string; enabled: boolean });
         }
       }
     };
@@ -162,25 +166,90 @@ export default function AlertsPage() {
     };
   }, [fetchAlerts]);
 
+  // Cleanup polling on unmount
+  useEffect(() => {
+    return () => {
+      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+    };
+  }, []);
+
   // Handlers
   const handleFetchAlerts = async () => {
-    setIsFetching(true);
-    try {
-      await supabase.functions.invoke('trigger-uipath', {
-        body: { action: 'fetch_alerts' },
-      });
-      enqueueSnackbar(t('fetchSuccess'), { variant: 'success' });
+    if (!uipathFetchConfig?.enabled || !uipathFetchConfig?.invoke_url) {
+      enqueueSnackbar(t('uipathNotConfigured'), { variant: 'warning' });
+      return;
+    }
 
-      // Trigger root cause analysis
-      await supabase.functions.invoke('trigger-uipath', {
-        body: { action: 'root_cause_analysis' },
+    setIsFetching(true);
+    enqueueSnackbar(t('jobStarting'), { variant: 'info' });
+
+    try {
+      // Step 1: Start the UiPath process via API Trigger
+      const startRes = await fetch('/api/uipath-job', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'start',
+          invoke_url: uipathFetchConfig.invoke_url,
+          personal_access_token: uipathFetchConfig.personal_access_token,
+        }),
       });
-      enqueueSnackbar(t('rootCauseSuccess'), { variant: 'info' });
-    } catch {
-      enqueueSnackbar(t('fetchError'), { variant: 'error' });
-    } finally {
+
+      const startData = await startRes.json();
+      if (!startRes.ok) throw new Error(startData.error || 'Failed to start UiPath process');
+
+      // If job completed immediately (synchronous response)
+      if (startData.completed) {
+        setIsFetching(false);
+        enqueueSnackbar(t('fetchSuccess'), { variant: 'success' });
+        fetchAlerts();
+        return;
+      }
+
+      // Step 2: Job is running — poll the status URL until completed
+      const pollUrl = startData.pollUrl;
+      if (!pollUrl) throw new Error('No poll URL returned from UiPath API Trigger');
+
+      enqueueSnackbar(t('jobStarted'), { variant: 'info' });
+      let currentPollUrl = pollUrl;
+
+      pollIntervalRef.current = setInterval(async () => {
+        try {
+          const pollRes = await fetch('/api/uipath-job', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'poll',
+              poll_url: currentPollUrl,
+              personal_access_token: uipathFetchConfig.personal_access_token,
+            }),
+          });
+
+          const pollData = await pollRes.json();
+          if (!pollRes.ok) throw new Error(pollData.error || 'Failed to check job status');
+
+          if (pollData.completed) {
+            if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+            pollIntervalRef.current = null;
+            setIsFetching(false);
+            enqueueSnackbar(t('fetchSuccess'), { variant: 'success' });
+            fetchAlerts();
+          } else {
+            // Update poll URL if it changed
+            if (pollData.pollUrl) currentPollUrl = pollData.pollUrl;
+          }
+        } catch (pollErr) {
+          if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+          pollIntervalRef.current = null;
+          setIsFetching(false);
+          const msg = pollErr instanceof Error ? pollErr.message : 'Polling error';
+          enqueueSnackbar(msg, { variant: 'error' });
+        }
+      }, 5000); // Poll every 5 seconds
+    } catch (err) {
       setIsFetching(false);
-      fetchAlerts();
+      const message = err instanceof Error ? err.message : t('fetchError');
+      enqueueSnackbar(message, { variant: 'error' });
     }
   };
 
@@ -393,7 +462,21 @@ export default function AlertsPage() {
         <Box display="flex" gap={1}>
           <Button
             variant="contained"
-            startIcon={<FetchIcon />}
+            startIcon={
+              isFetching ? (
+                <SyncIcon
+                  sx={{
+                    animation: 'spin 1s linear infinite',
+                    '@keyframes spin': {
+                      '0%': { transform: 'rotate(0deg)' },
+                      '100%': { transform: 'rotate(360deg)' },
+                    },
+                  }}
+                />
+              ) : (
+                <FetchIcon />
+              )
+            }
             onClick={handleFetchAlerts}
             disabled={isFetching}
           >

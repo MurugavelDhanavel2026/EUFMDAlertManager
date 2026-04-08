@@ -22,6 +22,13 @@
   },
   "uipathConfig": {
     "title": "UiPath Configuration",
+    "baseUrl": "Orchestrator Base URL",
+    "clientId": "Client ID (App ID)",
+    "clientSecret": "Client Secret",
+    "releaseKey": "Process Release Key",
+    "folderId": "Folder ID",
+    "invokeUrl": "API Trigger Invoke URL",
+    "personalAccessToken": "Personal Access Token",
     "fetchEndpoint": "Fetch Alerts Endpoint",
     "rootCauseEndpoint": "Root Cause Analysis Endpoint",
     "apiKey": "API Key",

@@ -37,6 +37,9 @@
     "success": "Antwort erfolgreich gesendet",
     "error": "Antwort konnte nicht gesendet werden"
   },
+  "uipathNotConfigured": "UiPath ist nicht konfiguriert oder deaktiviert. Bitte in den Admin-Einstellungen einrichten.",
+  "jobStarting": "UiPath-Prozess wird gestartet...",
+  "jobStarted": "UiPath-Prozess läuft. Warten auf Abschluss...",
   "fetchSuccess": "Alarme erfolgreich abgerufen",
   "fetchError": "Alarme konnten nicht abgerufen werden",
   "updateSuccess": "Alarm erfolgreich aktualisiert",
