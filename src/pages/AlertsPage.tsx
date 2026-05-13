@@ -28,6 +28,7 @@ import {
   Grid,
   Paper,
   LinearProgress,
+  Divider,
 } from '@mui/material';
 import {
   Refresh as RefreshIcon,
@@ -36,6 +37,7 @@ import {
   Psychology as RootCauseIcon,
   Save as SaveIcon,
   Sync as SyncIcon,
+  PlayArrow as TriggerIcon,
 } from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
 import { useSnackbar } from 'notistack';
@@ -71,8 +73,8 @@ export default function AlertsPage() {
   // Inline editing
   const [editingRootCause, setEditingRootCause] = useState<Record<string, string>>({});
 
-  // NMVS Dialog
-  const [nmvsDialog, setNmvsDialog] = useState<{ open: boolean; alert: Alert | null }>({
+  // Action Dialog (validation status + NMVS response)
+  const [actionDialog, setActionDialog] = useState<{ open: boolean; alert: Alert | null }>({
     open: false,
     alert: null,
   });
@@ -80,7 +82,10 @@ export default function AlertsPage() {
   const [emailTemplate, setEmailTemplate] = useState<{ subject: string; body: string }>({ subject: '', body: '' });
   const [graphConfig, setGraphConfig] = useState<{ tenant_id: string; app_id: string; client_secret: string; sender_email: string } | null>(null);
   const [uipathFetchConfig, setUipathFetchConfig] = useState<{ invoke_url: string; personal_access_token: string; enabled: boolean } | null>(null);
+  const [uipathMasterDataConfig, setUipathMasterDataConfig] = useState<{ invoke_url: string; personal_access_token: string; enabled: boolean } | null>(null);
   const [isSendingEmail, setIsSendingEmail] = useState(false);
+  const [triggeredRows, setTriggeredRows] = useState<Set<number>>(new Set());
+  const [triggeringRow, setTriggeringRow] = useState<number | null>(null);
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const isAlertHandler = user?.role === 'AlertHandler';
@@ -111,12 +116,13 @@ export default function AlertsPage() {
       if (users) setAvailableUsers(users);
 
       // Fetch email settings and UiPath config
-      const { data: settings } = await supabase.from('app_settings').select('key, value').in('key', ['email_template', 'graph_api_config', 'uipath_fetch_alerts']);
+      const { data: settings } = await supabase.from('app_settings').select('key, value').in('key', ['email_template', 'graph_api_config', 'uipath_fetch_alerts', 'uipath_master_data_reporting']);
       if (settings) {
         for (const row of settings) {
           if (row.key === 'email_template') setEmailTemplate(row.value as { subject: string; body: string });
           if (row.key === 'graph_api_config') setGraphConfig(row.value as { tenant_id: string; app_id: string; client_secret: string; sender_email: string });
           if (row.key === 'uipath_fetch_alerts') setUipathFetchConfig(row.value as { invoke_url: string; personal_access_token: string; enabled: boolean });
+          if (row.key === 'uipath_master_data_reporting') setUipathMasterDataConfig(row.value as { invoke_url: string; personal_access_token: string; enabled: boolean });
         }
       }
     };
@@ -407,10 +413,10 @@ export default function AlertsPage() {
   };
 
   const handleRespondNMVS = async () => {
-    if (!nmvsDialog.alert) return;
+    if (!actionDialog.alert) return;
     setIsSendingEmail(true);
     try {
-      const alert = nmvsDialog.alert;
+      const alert = actionDialog.alert;
       const subject = getEmailSubject(alert);
       const body = getEmailBody(alert);
 
@@ -435,13 +441,87 @@ export default function AlertsPage() {
       if (!res.ok) throw new Error(result.error || 'Failed to send email');
 
       enqueueSnackbar(t('nmvsDialog.success'), { variant: 'success' });
-      setNmvsDialog({ open: false, alert: null });
-      setNmvsEmail('');
+      closeActionDialog();
     } catch (err) {
       const message = err instanceof Error ? err.message : t('nmvsDialog.error');
       enqueueSnackbar(message, { variant: 'error' });
     } finally {
       setIsSendingEmail(false);
+    }
+  };
+
+  // Validation status parsing — rows separated by ';', key/value separated by first '='
+  interface ValidationRow {
+    step: string;
+    statusText: string;
+  }
+
+  const parseValidationStatus = (raw: string | null | undefined): ValidationRow[] => {
+    if (!raw) return [];
+    return raw
+      .split(';')
+      .map((segment) => segment.trim())
+      .filter((segment) => segment.length > 0)
+      .map((segment) => {
+        const eqIdx = segment.indexOf('=');
+        if (eqIdx === -1) return { step: segment, statusText: '' };
+        return {
+          step: segment.slice(0, eqIdx).trim(),
+          statusText: segment.slice(eqIdx + 1).trim(),
+        };
+      });
+  };
+
+  const getValidationStatusColor = (statusText: string): 'success' | 'error' | 'warning' | 'default' => {
+    const lower = statusText.toLowerCase();
+    if (lower.includes('fail')) return 'error';
+    if (lower.includes('success') || lower.includes('complete')) return 'success';
+    if (needsMasterDataTrigger(statusText)) return 'warning';
+    return 'default';
+  };
+
+  const needsMasterDataTrigger = (statusText: string): boolean => {
+    const lower = statusText.toLowerCase();
+    return lower.includes('not reported') || lower.includes('trigger reporting') || lower.includes('needs to trigger');
+  };
+
+  const closeActionDialog = () => {
+    setActionDialog({ open: false, alert: null });
+    setNmvsEmail('');
+    setTriggeredRows(new Set());
+    setTriggeringRow(null);
+  };
+
+  const handleTriggerMasterDataReporting = async (rowIndex: number) => {
+    if (!uipathMasterDataConfig?.enabled || !uipathMasterDataConfig?.invoke_url) {
+      enqueueSnackbar(t('masterDataNotConfigured'), { variant: 'warning' });
+      return;
+    }
+    setTriggeringRow(rowIndex);
+    try {
+      const res = await fetch('/api/uipath-job', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'start',
+          invoke_url: uipathMasterDataConfig.invoke_url,
+          personal_access_token: uipathMasterDataConfig.personal_access_token,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to trigger UiPath automation');
+
+      setTriggeredRows((prev) => {
+        const next = new Set(prev);
+        next.add(rowIndex);
+        return next;
+      });
+      enqueueSnackbar(t('masterDataTriggered'), { variant: 'success' });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : t('masterDataTriggerError');
+      enqueueSnackbar(message, { variant: 'error' });
+    } finally {
+      setTriggeringRow(null);
     }
   };
 
@@ -738,12 +818,12 @@ export default function AlertsPage() {
                         : '-'}
                     </TableCell>
                     <TableCell>
-                      <Tooltip title={t('respondNMVS')}>
+                      <Tooltip title={t('actionDialog.title')}>
                         <IconButton
                           size="small"
                           color="primary"
                           onClick={() =>
-                            setNmvsDialog({ open: true, alert })
+                            setActionDialog({ open: true, alert })
                           }
                         >
                           <SendIcon fontSize="small" />
@@ -771,17 +851,106 @@ export default function AlertsPage() {
         />
       </Card>
 
-      {/* NMVS Response Dialog */}
+      {/* Action Dialog: validation status + NMVS response */}
       <Dialog
-        open={nmvsDialog.open}
-        onClose={() => setNmvsDialog({ open: false, alert: null })}
+        open={actionDialog.open}
+        onClose={closeActionDialog}
         maxWidth="md"
         fullWidth
       >
-        <DialogTitle>{t('nmvsDialog.title')}</DialogTitle>
+        <DialogTitle>{t('actionDialog.title')}</DialogTitle>
         <DialogContent>
           <Typography variant="body2" color="text.secondary" mb={2}>
-            Alert ID: {nmvsDialog.alert?.alert_id} | Market: {nmvsDialog.alert?.target_market}
+            Alert ID: {actionDialog.alert?.alert_id} | Status: {actionDialog.alert ? tc(`statuses.${actionDialog.alert.status}`) : ''} | Market: {actionDialog.alert?.target_market}
+          </Typography>
+
+          {/* Validation Status Section */}
+          <Typography variant="subtitle1" fontWeight={600} mb={1}>
+            {t('actionDialog.validationStatus')}
+          </Typography>
+          {(() => {
+            if (!actionDialog.alert) return null;
+            const isInProgress = actionDialog.alert.status === 'InProgress';
+            const rows = isInProgress ? parseValidationStatus(actionDialog.alert.validation_status) : [];
+
+            if (!isInProgress) {
+              return (
+                <Box sx={{ bgcolor: 'grey.100', p: 2, borderRadius: 1, mb: 3 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    {t('actionDialog.notInProgress')}
+                  </Typography>
+                </Box>
+              );
+            }
+
+            if (rows.length === 0) {
+              return (
+                <Box sx={{ bgcolor: 'grey.100', p: 2, borderRadius: 1, mb: 3 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    {t('actionDialog.noValidationData')}
+                  </Typography>
+                </Box>
+              );
+            }
+
+            return (
+              <TableContainer component={Paper} variant="outlined" sx={{ mb: 3 }}>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>{t('actionDialog.columns.step')}</TableCell>
+                      <TableCell>{t('actionDialog.columns.status')}</TableCell>
+                      <TableCell align="right">{tc('actions')}</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {rows.map((row, idx) => {
+                      const color = getValidationStatusColor(row.statusText);
+                      const showTrigger = needsMasterDataTrigger(row.statusText);
+                      const alreadyTriggered = triggeredRows.has(idx);
+                      const isTriggeringThis = triggeringRow === idx;
+                      return (
+                        <TableRow key={idx}>
+                          <TableCell>{row.step}</TableCell>
+                          <TableCell>
+                            <Chip
+                              label={row.statusText || '-'}
+                              size="small"
+                              color={color}
+                              variant={color === 'default' ? 'outlined' : 'filled'}
+                            />
+                          </TableCell>
+                          <TableCell align="right">
+                            {showTrigger && (
+                              <Button
+                                size="small"
+                                variant="contained"
+                                color="warning"
+                                startIcon={<TriggerIcon />}
+                                disabled={alreadyTriggered || isTriggeringThis}
+                                onClick={() => handleTriggerMasterDataReporting(idx)}
+                              >
+                                {alreadyTriggered
+                                  ? t('actionDialog.triggered')
+                                  : isTriggeringThis
+                                    ? t('actionDialog.triggering')
+                                    : t('actionDialog.triggerReporting')}
+                              </Button>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            );
+          })()}
+
+          {/* NMVS Response Section */}
+          <Divider sx={{ my: 2 }} />
+          <Typography variant="subtitle1" fontWeight={600} mb={1}>
+            {t('nmvsDialog.title')}
           </Typography>
 
           {!graphConfig?.tenant_id && (
@@ -803,7 +972,7 @@ export default function AlertsPage() {
           <TextField
             fullWidth
             label={t('nmvsDialog.subject')}
-            value={nmvsDialog.alert ? getEmailSubject(nmvsDialog.alert) : ''}
+            value={actionDialog.alert ? getEmailSubject(actionDialog.alert) : ''}
             slotProps={{ input: { readOnly: true } }}
             sx={{ mb: 2 }}
           />
@@ -822,12 +991,12 @@ export default function AlertsPage() {
               mb: 1,
             }}
             dangerouslySetInnerHTML={{
-              __html: nmvsDialog.alert ? getEmailBody(nmvsDialog.alert) : '',
+              __html: actionDialog.alert ? getEmailBody(actionDialog.alert) : '',
             }}
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setNmvsDialog({ open: false, alert: null })}>{tc('cancel')}</Button>
+          <Button onClick={closeActionDialog}>{tc('cancel')}</Button>
           <Button
             variant="contained"
             startIcon={<SendIcon />}

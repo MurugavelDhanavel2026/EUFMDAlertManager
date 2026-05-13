@@ -122,6 +122,12 @@ export default function AdminPage() {
     enabled: false,
   });
 
+  const [uipathMasterData, setUipathMasterData] = useState<UiPathFetchConfig>({
+    invoke_url: '',
+    personal_access_token: '',
+    enabled: false,
+  });
+
   const [uipathRootCause, setUipathRootCause] = useState<UiPathConfig>({
     base_url: '',
     client_id: '',
@@ -152,6 +158,9 @@ export default function AdminPage() {
               break;
             case 'uipath_fetch_alerts':
               setUipathFetch(row.value as UiPathFetchConfig);
+              break;
+            case 'uipath_master_data_reporting':
+              setUipathMasterData(row.value as UiPathFetchConfig);
               break;
             case 'uipath_root_cause':
               setUipathRootCause(row.value as UiPathConfig);
@@ -447,6 +456,68 @@ export default function AdminPage() {
                     saveSetting(
                       'uipath_fetch_alerts',
                       uipathFetch,
+                      t('uipathConfig.success'),
+                      t('uipathConfig.error')
+                    )
+                  }
+                >
+                  {t('uipathConfig.save')}
+                </Button>
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        {/* UiPath Master Data Reporting */}
+        <Grid size={{ xs: 12, md: 6 }}>
+          <Card>
+            <CardHeader
+              title={`${t('uipathConfig.title')} - Master Data Reporting`}
+              subheader="Configure UiPath API Trigger for master data reporting"
+            />
+            <Divider />
+            <CardContent>
+              <Alert severity="info" sx={{ mb: 2 }}>
+                Set up an API Trigger in UiPath Maestro and generate a Personal Access Token. This automation is invoked from the Alert action dialog when a validation step is "Not reported".
+              </Alert>
+              <TextField
+                fullWidth
+                size="small"
+                label={t('uipathConfig.invokeUrl')}
+                value={uipathMasterData.invoke_url}
+                onChange={(e) => setUipathMasterData((p) => ({ ...p, invoke_url: e.target.value }))}
+                placeholder="https://cloud.uipath.com/org/tenant/orchestrator_/t/<trigger-id>/ProcessName"
+                helperText="API Trigger Invoke URL from UiPath Maestro"
+                sx={{ mb: 2 }}
+              />
+              <TextField
+                fullWidth
+                size="small"
+                label={t('uipathConfig.personalAccessToken')}
+                type="password"
+                value={uipathMasterData.personal_access_token}
+                onChange={(e) => setUipathMasterData((p) => ({ ...p, personal_access_token: e.target.value }))}
+                helperText="Personal Access Token (PAT) from UiPath Automation Cloud"
+                sx={{ mb: 2 }}
+              />
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={uipathMasterData.enabled}
+                    onChange={(e) => setUipathMasterData((p) => ({ ...p, enabled: e.target.checked }))}
+                  />
+                }
+                label={t('uipathConfig.enabled')}
+                sx={{ mb: 2 }}
+              />
+              <Box>
+                <Button
+                  variant="contained"
+                  startIcon={<SaveIcon />}
+                  onClick={() =>
+                    saveSetting(
+                      'uipath_master_data_reporting',
+                      uipathMasterData,
                       t('uipathConfig.success'),
                       t('uipathConfig.error')
                     )

@@ -37,6 +37,22 @@
     "success": "Antwort erfolgreich gesendet",
     "error": "Antwort konnte nicht gesendet werden"
   },
+  "actionDialog": {
+    "title": "Alarm-Aktionen",
+    "validationStatus": "Validierungsstatus",
+    "noValidationData": "Für diesen Alarm liegen keine Validierungsdaten vor.",
+    "notInProgress": "Der Validierungsstatus ist nur für Alarme verfügbar, die in Bearbeitung sind.",
+    "columns": {
+      "step": "Validierungsschritt",
+      "status": "Status / Details"
+    },
+    "triggerReporting": "Meldung auslösen",
+    "triggering": "Wird ausgelöst...",
+    "triggered": "Ausgelöst"
+  },
+  "masterDataNotConfigured": "UiPath Stammdatenmeldung ist nicht konfiguriert oder deaktiviert. Bitte in den Admin-Einstellungen einrichten.",
+  "masterDataTriggered": "Stammdatenmeldungs-Automatisierung erfolgreich ausgelöst.",
+  "masterDataTriggerError": "Stammdatenmeldungs-Automatisierung konnte nicht ausgelöst werden.",
   "uipathNotConfigured": "UiPath ist nicht konfiguriert oder deaktiviert. Bitte in den Admin-Einstellungen einrichten.",
   "jobStarting": "UiPath-Prozess wird gestartet...",
   "jobStarted": "UiPath-Prozess läuft. Warten auf Abschluss...",

@@ -14,6 +14,7 @@ export interface Alert {
   batch_name: string | null;
   message_guid: string | null;
   root_cause: string | null;
+  validation_status: string | null;
   assigned_user: string | null;
   created_on: string;
   changed_on: string;
