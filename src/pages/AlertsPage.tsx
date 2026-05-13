@@ -482,7 +482,12 @@ export default function AlertsPage() {
 
   const needsMasterDataTrigger = (statusText: string): boolean => {
     const lower = statusText.toLowerCase();
-    return lower.includes('not reported') || lower.includes('trigger reporting') || lower.includes('needs to trigger');
+    return (
+      lower.includes('not reported') ||
+      lower.includes('retrigger') ||
+      lower.includes('trigger reporting') ||
+      lower.includes('needs to trigger')
+    );
   };
 
   const closeActionDialog = () => {
