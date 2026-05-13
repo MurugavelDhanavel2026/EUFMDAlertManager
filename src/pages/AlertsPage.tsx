@@ -871,7 +871,7 @@ export default function AlertsPage() {
           {(() => {
             if (!actionDialog.alert) return null;
             const isInProgress = actionDialog.alert.status === 'InProgress';
-            const rows = isInProgress ? parseValidationStatus(actionDialog.alert.validation_status) : [];
+            const rows = isInProgress ? parseValidationStatus(actionDialog.alert.ValidationStatus) : [];
 
             if (!isInProgress) {
               return (
