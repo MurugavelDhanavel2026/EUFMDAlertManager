@@ -60,6 +60,7 @@
     "empty": "Für diesen Alarm sind keine Verlaufsereignisse erfasst.",
     "system": "System",
     "unassigned": "Nicht zugewiesen",
+    "unknownUser": "Unbekannter Benutzer",
     "loadError": "Alarm-Verlauf konnte nicht geladen werden.",
     "events": {
       "created": "Alarm erstellt",

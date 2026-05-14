@@ -352,6 +352,30 @@ CREATE POLICY "alert_history_insert" ON public.alert_history
   );
 
 -- ============================================
+-- 9. USER DISPLAY MAP FUNCTION
+-- ============================================
+-- Resolves (id, username, display_name) for any user_profile IDs while
+-- bypassing user_profiles RLS. Used by alert history to show WHO acted,
+-- even when the viewer can't otherwise read the actor's profile.
+CREATE OR REPLACE FUNCTION public.get_user_display_map(p_user_ids UUID[])
+RETURNS TABLE (
+  id UUID,
+  username TEXT,
+  display_name TEXT
+)
+LANGUAGE sql
+SECURITY DEFINER
+STABLE
+AS $$
+  SELECT up.id, up.username, up.display_name
+  FROM public.user_profiles up
+  WHERE up.id = ANY(p_user_ids);
+$$;
+
+REVOKE ALL ON FUNCTION public.get_user_display_map(UUID[]) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.get_user_display_map(UUID[]) TO authenticated;
+
+-- ============================================
 -- DONE! All tables, indexes, functions, triggers,
 -- RLS policies, and seed data created.
 -- ============================================

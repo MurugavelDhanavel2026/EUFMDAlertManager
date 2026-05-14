@@ -102,6 +102,7 @@ export default function AlertsPage() {
   });
   const [historyEvents, setHistoryEvents] = useState<AlertHistoryEvent[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [historyUserMap, setHistoryUserMap] = useState<Record<string, string>>({});
 
   const isAlertHandler = user?.role === 'AlertHandler';
 
@@ -593,6 +594,7 @@ export default function AlertsPage() {
   const openHistoryDialog = async (alert: Alert) => {
     setHistoryDialog({ open: true, alert });
     setHistoryEvents([]);
+    setHistoryUserMap({});
     setIsLoadingHistory(true);
     try {
       const { data, error } = await supabase
@@ -601,7 +603,36 @@ export default function AlertsPage() {
         .eq('alert_id', alert.id)
         .order('performed_at', { ascending: false });
       if (error) throw error;
-      setHistoryEvents((data as AlertHistoryEvent[]) || []);
+      const events = (data as AlertHistoryEvent[]) || [];
+      setHistoryEvents(events);
+
+      // Collect every distinct user UUID referenced in this alert's history
+      // (performed_by + any user_assigned to/from values) and resolve them
+      // via the SECURITY DEFINER RPC so we can show display names instead
+      // of UUIDs even for actors the viewer can't normally read via RLS.
+      const ids = new Set<string>();
+      for (const ev of events) {
+        if (ev.performed_by) ids.add(ev.performed_by);
+        if (ev.event_type === 'user_assigned') {
+          const d = ev.event_data || {};
+          if (d.from) ids.add(String(d.from));
+          if (d.to) ids.add(String(d.to));
+        }
+      }
+      if (ids.size > 0) {
+        const { data: users, error: usersErr } = await supabase.rpc('get_user_display_map', {
+          p_user_ids: Array.from(ids),
+        });
+        if (usersErr) {
+          console.error('Failed to resolve history user names:', usersErr);
+        } else if (users) {
+          const map: Record<string, string> = {};
+          for (const u of users as Array<{ id: string; username: string | null; display_name: string | null }>) {
+            map[u.id] = u.display_name || u.username || u.id.slice(0, 8);
+          }
+          setHistoryUserMap(map);
+        }
+      }
     } catch (err) {
       console.error('Failed to load alert history:', err);
       enqueueSnackbar(t('history.loadError'), { variant: 'error' });
@@ -613,6 +644,7 @@ export default function AlertsPage() {
   const closeHistoryDialog = () => {
     setHistoryDialog({ open: false, alert: null });
     setHistoryEvents([]);
+    setHistoryUserMap({});
   };
 
   const getEventIcon = (eventType: AlertHistoryEventType) => {
@@ -641,8 +673,10 @@ export default function AlertsPage() {
 
   const resolveUserName = (userId: string | null): string => {
     if (!userId) return t('history.system');
+    if (historyUserMap[userId]) return historyUserMap[userId];
     const u = availableUsers.find((au) => au.id === userId);
-    return u ? (u.display_name || u.username) : userId.slice(0, 8);
+    if (u) return u.display_name || u.username;
+    return t('history.unknownUser');
   };
 
   const describeEvent = (event: AlertHistoryEvent): string => {

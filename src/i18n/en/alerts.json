@@ -60,6 +60,7 @@
     "empty": "No history events recorded for this alert.",
     "system": "System",
     "unassigned": "Unassigned",
+    "unknownUser": "Unknown user",
     "loadError": "Failed to load alert history.",
     "events": {
       "created": "Alert created",
