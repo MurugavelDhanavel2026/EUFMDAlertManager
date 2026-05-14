@@ -17,7 +17,8 @@
     "batchName": "Batch",
     "messageGUID": "Message GUID",
     "rootCause": "Root Cause / Comments",
-    "assignedUser": "Assigned User"
+    "assignedUser": "Assigned User",
+    "history": "History"
   },
   "bulk": {
     "selected": "{{count}} selected",
@@ -53,6 +54,30 @@
   "masterDataNotConfigured": "UiPath Master Data Reporting is not configured or disabled. Please set up in Admin settings.",
   "masterDataTriggered": "Master data reporting automation triggered successfully.",
   "masterDataTriggerError": "Failed to trigger master data reporting automation.",
+  "history": {
+    "viewHistory": "View History",
+    "dialogTitle": "Alert History",
+    "empty": "No history events recorded for this alert.",
+    "system": "System",
+    "unassigned": "Unassigned",
+    "loadError": "Failed to load alert history.",
+    "events": {
+      "created": "Alert created",
+      "status_changed": "Status changed",
+      "root_cause_updated": "Root cause updated",
+      "user_assigned": "User assigned",
+      "nmvs_response_sent": "NMVS response sent",
+      "master_data_triggered": "Master data reporting triggered"
+    },
+    "descriptions": {
+      "created": "Alert was inserted with initial status \"{{status}}\".",
+      "statusChanged": "Changed from \"{{from}}\" to \"{{to}}\".",
+      "rootCauseUpdated": "New value: \"{{value}}\".",
+      "userAssigned": "Assigned to {{user}}.",
+      "nmvsSent": "Response email sent to {{recipient}}.",
+      "masterDataTriggered": "UiPath automation triggered with GTIN {{gtin}}."
+    }
+  },
   "uipathNotConfigured": "UiPath is not configured or disabled. Please set up in Admin settings.",
   "jobStarting": "Starting UiPath process...",
   "jobStarted": "UiPath process running. Waiting for completion...",

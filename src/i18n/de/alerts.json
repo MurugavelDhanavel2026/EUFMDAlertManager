@@ -17,7 +17,8 @@
     "batchName": "Charge",
     "messageGUID": "Nachrichten-GUID",
     "rootCause": "Ursache / Kommentare",
-    "assignedUser": "Zugewiesener Benutzer"
+    "assignedUser": "Zugewiesener Benutzer",
+    "history": "Verlauf"
   },
   "bulk": {
     "selected": "{{count}} ausgewählt",
@@ -53,6 +54,30 @@
   "masterDataNotConfigured": "UiPath Stammdatenmeldung ist nicht konfiguriert oder deaktiviert. Bitte in den Admin-Einstellungen einrichten.",
   "masterDataTriggered": "Stammdatenmeldungs-Automatisierung erfolgreich ausgelöst.",
   "masterDataTriggerError": "Stammdatenmeldungs-Automatisierung konnte nicht ausgelöst werden.",
+  "history": {
+    "viewHistory": "Verlauf anzeigen",
+    "dialogTitle": "Alarm-Verlauf",
+    "empty": "Für diesen Alarm sind keine Verlaufsereignisse erfasst.",
+    "system": "System",
+    "unassigned": "Nicht zugewiesen",
+    "loadError": "Alarm-Verlauf konnte nicht geladen werden.",
+    "events": {
+      "created": "Alarm erstellt",
+      "status_changed": "Status geändert",
+      "root_cause_updated": "Ursache aktualisiert",
+      "user_assigned": "Benutzer zugewiesen",
+      "nmvs_response_sent": "NMVS-Antwort gesendet",
+      "master_data_triggered": "Stammdatenmeldung ausgelöst"
+    },
+    "descriptions": {
+      "created": "Alarm wurde mit Anfangsstatus \"{{status}}\" eingefügt.",
+      "statusChanged": "Von \"{{from}}\" zu \"{{to}}\" geändert.",
+      "rootCauseUpdated": "Neuer Wert: \"{{value}}\".",
+      "userAssigned": "Zugewiesen an {{user}}.",
+      "nmvsSent": "Antwort-E-Mail an {{recipient}} gesendet.",
+      "masterDataTriggered": "UiPath-Automatisierung mit GTIN {{gtin}} ausgelöst."
+    }
+  },
   "uipathNotConfigured": "UiPath ist nicht konfiguriert oder deaktiviert. Bitte in den Admin-Einstellungen einrichten.",
   "jobStarting": "UiPath-Prozess wird gestartet...",
   "jobStarted": "UiPath-Prozess läuft. Warten auf Abschluss...",

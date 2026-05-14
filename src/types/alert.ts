@@ -31,6 +31,23 @@ export interface AlertFilters {
   year?: number;
 }
 
+export type AlertHistoryEventType =
+  | 'created'
+  | 'status_changed'
+  | 'root_cause_updated'
+  | 'user_assigned'
+  | 'nmvs_response_sent'
+  | 'master_data_triggered';
+
+export interface AlertHistoryEvent {
+  id: string;
+  alert_id: string;
+  event_type: AlertHistoryEventType;
+  event_data: Record<string, unknown>;
+  performed_by: string | null;
+  performed_at: string;
+}
+
 export interface BulkOperation {
   id: string;
   requested_by: string;

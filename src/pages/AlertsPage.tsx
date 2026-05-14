@@ -38,13 +38,20 @@ import {
   Save as SaveIcon,
   Sync as SyncIcon,
   PlayArrow as TriggerIcon,
+  History as HistoryIcon,
+  AddCircleOutline as CreatedIcon,
+  SwapHoriz as StatusChangeIcon,
+  EditNote as RootCauseEditIcon,
+  PersonAdd as AssignIcon,
+  MailOutline as MailSentIcon,
+  BoltOutlined as TriggeredIcon,
 } from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
 import { useSnackbar } from 'notistack';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../config/supabase';
 import { ALERT_STATUSES, PAGE_SIZE_OPTIONS, DEFAULT_PAGE_SIZE } from '../config/constants';
-import type { Alert } from '../types/alert';
+import type { Alert, AlertHistoryEvent, AlertHistoryEventType } from '../types/alert';
 import type { User } from '../types/user';
 import dayjs from 'dayjs';
 
@@ -87,6 +94,14 @@ export default function AlertsPage() {
   const [triggeredRows, setTriggeredRows] = useState<Set<number>>(new Set());
   const [triggeringRow, setTriggeringRow] = useState<number | null>(null);
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // History Dialog
+  const [historyDialog, setHistoryDialog] = useState<{ open: boolean; alert: Alert | null }>({
+    open: false,
+    alert: null,
+  });
+  const [historyEvents, setHistoryEvents] = useState<AlertHistoryEvent[]>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
 
   const isAlertHandler = user?.role === 'AlertHandler';
 
@@ -440,6 +455,11 @@ export default function AlertsPage() {
       const result = await res.json();
       if (!res.ok) throw new Error(result.error || 'Failed to send email');
 
+      void logHistoryEvent(alert.id, 'nmvs_response_sent', {
+        recipient: nmvsEmail,
+        subject,
+      });
+
       enqueueSnackbar(t('nmvsDialog.success'), { variant: 'success' });
       closeActionDialog();
     } catch (err) {
@@ -447,6 +467,23 @@ export default function AlertsPage() {
       enqueueSnackbar(message, { variant: 'error' });
     } finally {
       setIsSendingEmail(false);
+    }
+  };
+
+  const logHistoryEvent = async (
+    alertId: string,
+    eventType: AlertHistoryEventType,
+    eventData: Record<string, unknown>
+  ) => {
+    try {
+      await supabase.from('alert_history').insert({
+        alert_id: alertId,
+        event_type: eventType,
+        event_data: eventData,
+        performed_by: user?.id ?? null,
+      });
+    } catch (err) {
+      console.error('Failed to log history event:', err);
     }
   };
 
@@ -528,6 +565,12 @@ export default function AlertsPage() {
         next.add(rowIndex);
         return next;
       });
+
+      void logHistoryEvent(alert.id, 'master_data_triggered', {
+        alert_id: alert.alert_id,
+        gtin: alert.gtin,
+      });
+
       enqueueSnackbar(t('masterDataTriggered'), { variant: 'success' });
     } catch (err) {
       const message = err instanceof Error ? err.message : t('masterDataTriggerError');
@@ -544,6 +587,90 @@ export default function AlertsPage() {
       case 'Closed': return 'success';
       case 'OnHold': return 'default';
       default: return 'default';
+    }
+  };
+
+  const openHistoryDialog = async (alert: Alert) => {
+    setHistoryDialog({ open: true, alert });
+    setHistoryEvents([]);
+    setIsLoadingHistory(true);
+    try {
+      const { data, error } = await supabase
+        .from('alert_history')
+        .select('*')
+        .eq('alert_id', alert.id)
+        .order('performed_at', { ascending: false });
+      if (error) throw error;
+      setHistoryEvents((data as AlertHistoryEvent[]) || []);
+    } catch (err) {
+      console.error('Failed to load alert history:', err);
+      enqueueSnackbar(t('history.loadError'), { variant: 'error' });
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  };
+
+  const closeHistoryDialog = () => {
+    setHistoryDialog({ open: false, alert: null });
+    setHistoryEvents([]);
+  };
+
+  const getEventIcon = (eventType: AlertHistoryEventType) => {
+    switch (eventType) {
+      case 'created': return <CreatedIcon fontSize="small" />;
+      case 'status_changed': return <StatusChangeIcon fontSize="small" />;
+      case 'root_cause_updated': return <RootCauseEditIcon fontSize="small" />;
+      case 'user_assigned': return <AssignIcon fontSize="small" />;
+      case 'nmvs_response_sent': return <MailSentIcon fontSize="small" />;
+      case 'master_data_triggered': return <TriggeredIcon fontSize="small" />;
+      default: return <HistoryIcon fontSize="small" />;
+    }
+  };
+
+  const getEventColor = (eventType: AlertHistoryEventType): 'primary' | 'info' | 'success' | 'warning' | 'secondary' | 'default' => {
+    switch (eventType) {
+      case 'created': return 'primary';
+      case 'status_changed': return 'info';
+      case 'root_cause_updated': return 'secondary';
+      case 'user_assigned': return 'secondary';
+      case 'nmvs_response_sent': return 'success';
+      case 'master_data_triggered': return 'warning';
+      default: return 'default';
+    }
+  };
+
+  const resolveUserName = (userId: string | null): string => {
+    if (!userId) return t('history.system');
+    const u = availableUsers.find((au) => au.id === userId);
+    return u ? (u.display_name || u.username) : userId.slice(0, 8);
+  };
+
+  const describeEvent = (event: AlertHistoryEvent): string => {
+    const d = event.event_data || {};
+    switch (event.event_type) {
+      case 'created':
+        return t('history.descriptions.created', { status: String(d.status ?? '') });
+      case 'status_changed':
+        return t('history.descriptions.statusChanged', {
+          from: String(d.from ?? ''),
+          to: String(d.to ?? ''),
+        });
+      case 'root_cause_updated': {
+        const newVal = d.to ? String(d.to) : t('history.empty');
+        return t('history.descriptions.rootCauseUpdated', { value: newVal });
+      }
+      case 'user_assigned': {
+        const toName = d.to ? resolveUserName(String(d.to)) : t('history.unassigned');
+        return t('history.descriptions.userAssigned', { user: toName });
+      }
+      case 'nmvs_response_sent':
+        return t('history.descriptions.nmvsSent', { recipient: String(d.recipient ?? '') });
+      case 'master_data_triggered':
+        return t('history.descriptions.masterDataTriggered', {
+          gtin: d.gtin ? String(d.gtin) : '—',
+        });
+      default:
+        return event.event_type;
     }
   };
 
@@ -704,13 +831,14 @@ export default function AlertsPage() {
                 <TableCell>{t('columns.assignedUser')}</TableCell>
                 <TableCell>{tc('createdOn')}</TableCell>
                 <TableCell>{tc('changedOn')}</TableCell>
+                <TableCell>{t('columns.history')}</TableCell>
                 <TableCell>{tc('actions')}</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {alerts.length === 0 && !isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={16} align="center" sx={{ py: 4 }}>
+                  <TableCell colSpan={17} align="center" sx={{ py: 4 }}>
                     <Typography color="text.secondary">{tc('noData')}</Typography>
                   </TableCell>
                 </TableRow>
@@ -828,6 +956,17 @@ export default function AlertsPage() {
                       {alert.changed_on
                         ? dayjs(alert.changed_on).format('YYYY-MM-DD HH:mm')
                         : '-'}
+                    </TableCell>
+                    <TableCell>
+                      <Tooltip title={t('history.viewHistory')}>
+                        <IconButton
+                          size="small"
+                          color="primary"
+                          onClick={() => openHistoryDialog(alert)}
+                        >
+                          <HistoryIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
                     </TableCell>
                     <TableCell>
                       <Tooltip title={t('actionDialog.title')}>
@@ -1017,6 +1156,88 @@ export default function AlertsPage() {
           >
             {isSendingEmail ? 'Sending...' : t('nmvsDialog.send')}
           </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* History Dialog: timeline of audit events for the alert */}
+      <Dialog
+        open={historyDialog.open}
+        onClose={closeHistoryDialog}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>
+          {t('history.dialogTitle')}
+          {historyDialog.alert && (
+            <Typography variant="body2" color="text.secondary" component="div">
+              {historyDialog.alert.alert_id}
+            </Typography>
+          )}
+        </DialogTitle>
+        <DialogContent>
+          {isLoadingHistory ? (
+            <Box sx={{ py: 3 }}>
+              <LinearProgress />
+            </Box>
+          ) : historyEvents.length === 0 ? (
+            <Box sx={{ bgcolor: 'grey.100', p: 2, borderRadius: 1, textAlign: 'center' }}>
+              <Typography variant="body2" color="text.secondary">
+                {t('history.empty')}
+              </Typography>
+            </Box>
+          ) : (
+            <Box sx={{ position: 'relative', pl: 4 }}>
+              {/* vertical connector line */}
+              <Box
+                sx={{
+                  position: 'absolute',
+                  left: 15,
+                  top: 12,
+                  bottom: 12,
+                  width: '2px',
+                  bgcolor: 'divider',
+                }}
+              />
+              {historyEvents.map((event) => {
+                const color = getEventColor(event.event_type);
+                return (
+                  <Box key={event.id} sx={{ position: 'relative', mb: 2.5 }}>
+                    <Box
+                      sx={{
+                        position: 'absolute',
+                        left: -25,
+                        top: 0,
+                        width: 32,
+                        height: 32,
+                        borderRadius: '50%',
+                        bgcolor: color === 'default' ? 'grey.400' : `${color}.main`,
+                        color: 'white',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      {getEventIcon(event.event_type)}
+                    </Box>
+                    <Box sx={{ ml: 1.5 }}>
+                      <Typography variant="subtitle2" fontWeight={600}>
+                        {t(`history.events.${event.event_type}`)}
+                      </Typography>
+                      <Typography variant="body2" color="text.primary">
+                        {describeEvent(event)}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {dayjs(event.performed_at).format('YYYY-MM-DD HH:mm:ss')} • {resolveUserName(event.performed_by)}
+                      </Typography>
+                    </Box>
+                  </Box>
+                );
+              })}
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={closeHistoryDialog}>{tc('close')}</Button>
         </DialogActions>
       </Dialog>
     </Box>
