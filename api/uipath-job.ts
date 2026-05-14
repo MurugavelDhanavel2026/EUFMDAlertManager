@@ -4,6 +4,7 @@ interface StartRequest {
   action: 'start';
   invoke_url: string;
   personal_access_token: string;
+  inputs?: Record<string, string | number | boolean | null | undefined>;
 }
 
 interface PollRequest {
@@ -30,8 +31,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(400).json({ error: 'UiPath API Trigger not configured. Please set up Invoke URL and Personal Access Token in Admin settings.' });
       }
 
+      // Append inputs as query string parameters (UiPath API Trigger reads
+      // GET inputs from the URL query string and binds them to workflow args).
+      let invokeUrl = body.invoke_url;
+      if (body.inputs && Object.keys(body.inputs).length > 0) {
+        const params = new URLSearchParams();
+        for (const [key, value] of Object.entries(body.inputs)) {
+          if (value === undefined || value === null) continue;
+          params.set(key, String(value));
+        }
+        const qs = params.toString();
+        if (qs) {
+          invokeUrl = body.invoke_url.includes('?')
+            ? `${body.invoke_url}&${qs}`
+            : `${body.invoke_url}?${qs}`;
+        }
+      }
+
       // Start the job via GET — use redirect: "manual" so we can capture 303 + Location
-      const response = await fetch(body.invoke_url, {
+      const response = await fetch(invokeUrl, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${body.personal_access_token}`,

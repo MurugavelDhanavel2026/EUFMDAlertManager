@@ -502,6 +502,9 @@ export default function AlertsPage() {
       enqueueSnackbar(t('masterDataNotConfigured'), { variant: 'warning' });
       return;
     }
+    const alert = actionDialog.alert;
+    if (!alert) return;
+
     setTriggeringRow(rowIndex);
     try {
       const res = await fetch('/api/uipath-job', {
@@ -511,6 +514,10 @@ export default function AlertsPage() {
           action: 'start',
           invoke_url: uipathMasterDataConfig.invoke_url,
           personal_access_token: uipathMasterDataConfig.personal_access_token,
+          inputs: {
+            alert_id: alert.alert_id,
+            in_GTIN: alert.gtin ?? '',
+          },
         }),
       });
       const data = await res.json();
