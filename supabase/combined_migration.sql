@@ -117,7 +117,6 @@ CREATE TABLE IF NOT EXISTS public.app_settings (
 INSERT INTO public.app_settings (key, value) VALUES
   ('smtp_config', '{"host": "", "port": 587, "user": "", "password": "", "from_email": ""}'),
   ('uipath_fetch_alerts', '{"endpoint": "", "api_key": "", "enabled": false}'),
-  ('uipath_root_cause', '{"endpoint": "", "api_key": "", "enabled": false}'),
   ('uipath_master_data_reporting', '{"invoke_url": "", "personal_access_token": "", "enabled": false}'),
   ('db_config', '{"supabase_url": "", "supabase_anon_key": ""}')
 ON CONFLICT (key) DO NOTHING;
