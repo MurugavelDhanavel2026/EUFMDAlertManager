@@ -17,7 +17,19 @@
     "messageGUID": "Nachrichten-GUID",
     "rootCause": "Ursache / Kommentare",
     "assignedUser": "Zugewiesener Benutzer",
-    "history": "Verlauf"
+    "details": "Details"
+  },
+  "details": {
+    "viewDetails": "Details anzeigen",
+    "dialogTitle": "Alarm-Details",
+    "fieldsTitle": "Feldwerte",
+    "historyTitle": "Verlauf"
+  },
+  "retriggerValidations": {
+    "tooltip": "Alle Validierungen erneut auslösen",
+    "notConfigured": "UiPath Maestro (Validierungen erneut auslösen) ist nicht konfiguriert oder deaktiviert. Bitte in den Admin-Einstellungen einrichten.",
+    "success": "Workflow zum erneuten Auslösen der Validierungen erfolgreich gestartet.",
+    "error": "Validierungen konnten nicht erneut ausgelöst werden."
   },
   "columnsConfig": {
     "tooltip": "Spalten konfigurieren",
@@ -68,8 +80,6 @@
   "masterDataTriggered": "Stammdatenmeldungs-Automatisierung erfolgreich ausgelöst.",
   "masterDataTriggerError": "Stammdatenmeldungs-Automatisierung konnte nicht ausgelöst werden.",
   "history": {
-    "viewHistory": "Verlauf anzeigen",
-    "dialogTitle": "Alarm-Verlauf",
     "empty": "Für diesen Alarm sind keine Verlaufsereignisse erfasst.",
     "system": "System",
     "unassigned": "Nicht zugewiesen",
@@ -81,7 +91,8 @@
       "root_cause_updated": "Ursache aktualisiert",
       "user_assigned": "Benutzer zugewiesen",
       "nmvs_response_sent": "NMVS-Antwort gesendet",
-      "master_data_triggered": "Stammdatenmeldung ausgelöst"
+      "master_data_triggered": "Stammdatenmeldung ausgelöst",
+      "validations_retriggered": "Validierungen erneut ausgelöst"
     },
     "descriptions": {
       "created": "Alarm wurde mit Anfangsstatus \"{{status}}\" eingefügt.",
@@ -89,7 +100,8 @@
       "rootCauseUpdated": "Neuer Wert: \"{{value}}\".",
       "userAssigned": "Zugewiesen an {{user}}.",
       "nmvsSent": "Antwort-E-Mail an {{recipient}} gesendet.",
-      "masterDataTriggered": "UiPath-Automatisierung mit GTIN {{gtin}} ausgelöst."
+      "masterDataTriggered": "UiPath-Automatisierung mit GTIN {{gtin}} ausgelöst.",
+      "validationsRetriggered": "Maestro-Workflow mit EPC {{epc}} gestartet."
     }
   },
   "uipathNotConfigured": "UiPath ist nicht konfiguriert oder deaktiviert. Bitte in den Admin-Einstellungen einrichten.",

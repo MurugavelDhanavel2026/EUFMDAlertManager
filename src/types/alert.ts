@@ -37,7 +37,8 @@ export type AlertHistoryEventType =
   | 'root_cause_updated'
   | 'user_assigned'
   | 'nmvs_response_sent'
-  | 'master_data_triggered';
+  | 'master_data_triggered'
+  | 'validations_retriggered';
 
 export interface AlertHistoryEvent {
   id: string;

@@ -47,6 +47,8 @@ import {
   ViewColumn as ColumnsIcon,
   FilterList as FilterIcon,
   FilterAlt as FilterActiveIcon,
+  InfoOutlined as DetailsIcon,
+  Replay as RetriggerIcon,
 } from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
 import { useSnackbar } from 'notistack';
@@ -89,7 +91,7 @@ const ALERT_COLUMNS: AlertColumnDef[] = [
   { key: 'assigned_user', ns: 'alerts', labelKey: 'columns.assignedUser', filter: 'user', dbColumn: 'assigned_user' },
   { key: 'created_on', ns: 'common', labelKey: 'createdOn', filter: 'date', dbColumn: 'created_on' },
   { key: 'changed_on', ns: 'common', labelKey: 'changedOn', filter: 'date', dbColumn: 'changed_on' },
-  { key: 'history', ns: 'alerts', labelKey: 'columns.history', filter: 'none' },
+  { key: 'details', ns: 'alerts', labelKey: 'columns.details', filter: 'none' },
 ];
 
 // By default every column is visible (in canonical order above).
@@ -139,13 +141,15 @@ export default function AlertsPage() {
   const [graphConfig, setGraphConfig] = useState<{ tenant_id: string; app_id: string; client_secret: string; sender_email: string } | null>(null);
   const [uipathFetchConfig, setUipathFetchConfig] = useState<{ invoke_url: string; personal_access_token: string; enabled: boolean } | null>(null);
   const [uipathMasterDataConfig, setUipathMasterDataConfig] = useState<{ invoke_url: string; personal_access_token: string; enabled: boolean } | null>(null);
+  const [uipathMaestroConfig, setUipathMaestroConfig] = useState<{ invoke_url: string; personal_access_token: string; enabled: boolean } | null>(null);
+  const [retriggeringValidations, setRetriggeringValidations] = useState<Set<string>>(new Set());
   const [isSendingEmail, setIsSendingEmail] = useState(false);
   const [triggeredRows, setTriggeredRows] = useState<Set<number>>(new Set());
   const [triggeringRow, setTriggeringRow] = useState<number | null>(null);
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // History Dialog
-  const [historyDialog, setHistoryDialog] = useState<{ open: boolean; alert: Alert | null }>({
+  // Details Dialog (all field values + history timeline)
+  const [detailsDialog, setDetailsDialog] = useState<{ open: boolean; alert: Alert | null }>({
     open: false,
     alert: null,
   });
@@ -181,13 +185,14 @@ export default function AlertsPage() {
       if (users) setAvailableUsers(users);
 
       // Fetch email settings and UiPath config
-      const { data: settings } = await supabase.from('app_settings').select('key, value').in('key', ['email_template', 'graph_api_config', 'uipath_fetch_alerts', 'uipath_master_data_reporting']);
+      const { data: settings } = await supabase.from('app_settings').select('key, value').in('key', ['email_template', 'graph_api_config', 'uipath_fetch_alerts', 'uipath_master_data_reporting', 'uipath_maestro_validations']);
       if (settings) {
         for (const row of settings) {
           if (row.key === 'email_template') setEmailTemplate(row.value as { subject: string; body: string });
           if (row.key === 'graph_api_config') setGraphConfig(row.value as { tenant_id: string; app_id: string; client_secret: string; sender_email: string });
           if (row.key === 'uipath_fetch_alerts') setUipathFetchConfig(row.value as { invoke_url: string; personal_access_token: string; enabled: boolean });
           if (row.key === 'uipath_master_data_reporting') setUipathMasterDataConfig(row.value as { invoke_url: string; personal_access_token: string; enabled: boolean });
+          if (row.key === 'uipath_maestro_validations') setUipathMaestroConfig(row.value as { invoke_url: string; personal_access_token: string; enabled: boolean });
         }
       }
 
@@ -666,6 +671,56 @@ export default function AlertsPage() {
     }
   };
 
+  // Retrigger all validations by starting the UiPath Maestro workflow. The
+  // workflow expects: epcIdURIValue = (01)<GTIN>(21)<Serial Number>,
+  // strGTIN = <GTIN>, TargetMarket = <target market>, alertid = <Alert ID>.
+  const handleRetriggerValidations = async (alert: Alert) => {
+    if (!uipathMaestroConfig?.enabled || !uipathMaestroConfig?.invoke_url) {
+      enqueueSnackbar(t('retriggerValidations.notConfigured'), { variant: 'warning' });
+      return;
+    }
+
+    const epcIdURIValue = `(01)${alert.gtin ?? ''}(21)${alert.serial_number ?? ''}`;
+    setRetriggeringValidations((prev) => new Set(prev).add(alert.id));
+    try {
+      const res = await fetch('/api/uipath-job', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'start',
+          invoke_url: uipathMaestroConfig.invoke_url,
+          personal_access_token: uipathMaestroConfig.personal_access_token,
+          inputs: {
+            epcIdURIValue,
+            strGTIN: alert.gtin ?? '',
+            TargetMarket: alert.target_market,
+            alertid: alert.alert_id,
+          },
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to retrigger validations');
+
+      void logHistoryEvent(alert.id, 'validations_retriggered', {
+        epcIdURIValue,
+        strGTIN: alert.gtin ?? '',
+        TargetMarket: alert.target_market,
+        alertid: alert.alert_id,
+      });
+
+      enqueueSnackbar(t('retriggerValidations.success'), { variant: 'success' });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : t('retriggerValidations.error');
+      enqueueSnackbar(message, { variant: 'error' });
+    } finally {
+      setRetriggeringValidations((prev) => {
+        const next = new Set(prev);
+        next.delete(alert.id);
+        return next;
+      });
+    }
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'Open': return 'warning';
@@ -676,8 +731,8 @@ export default function AlertsPage() {
     }
   };
 
-  const openHistoryDialog = async (alert: Alert) => {
-    setHistoryDialog({ open: true, alert });
+  const openDetailsDialog = async (alert: Alert) => {
+    setDetailsDialog({ open: true, alert });
     setHistoryEvents([]);
     setHistoryUserMap({});
     setIsLoadingHistory(true);
@@ -726,8 +781,8 @@ export default function AlertsPage() {
     }
   };
 
-  const closeHistoryDialog = () => {
-    setHistoryDialog({ open: false, alert: null });
+  const closeDetailsDialog = () => {
+    setDetailsDialog({ open: false, alert: null });
     setHistoryEvents([]);
     setHistoryUserMap({});
   };
@@ -740,6 +795,7 @@ export default function AlertsPage() {
       case 'user_assigned': return <AssignIcon fontSize="small" />;
       case 'nmvs_response_sent': return <MailSentIcon fontSize="small" />;
       case 'master_data_triggered': return <TriggeredIcon fontSize="small" />;
+      case 'validations_retriggered': return <RetriggerIcon fontSize="small" />;
       default: return <HistoryIcon fontSize="small" />;
     }
   };
@@ -752,6 +808,7 @@ export default function AlertsPage() {
       case 'user_assigned': return 'secondary';
       case 'nmvs_response_sent': return 'success';
       case 'master_data_triggered': return 'warning';
+      case 'validations_retriggered': return 'info';
       default: return 'default';
     }
   };
@@ -787,6 +844,10 @@ export default function AlertsPage() {
       case 'master_data_triggered':
         return t('history.descriptions.masterDataTriggered', {
           gtin: d.gtin ? String(d.gtin) : '—',
+        });
+      case 'validations_retriggered':
+        return t('history.descriptions.validationsRetriggered', {
+          epc: d.epcIdURIValue ? String(d.epcIdURIValue) : '—',
         });
       default:
         return event.event_type;
@@ -1002,12 +1063,12 @@ export default function AlertsPage() {
             {alert.changed_on ? dayjs(alert.changed_on).format('YYYY-MM-DD HH:mm') : '-'}
           </TableCell>
         );
-      case 'history':
+      case 'details':
         return (
           <TableCell key={col.key}>
-            <Tooltip title={t('history.viewHistory')}>
-              <IconButton size="small" color="primary" onClick={() => openHistoryDialog(alert)}>
-                <HistoryIcon fontSize="small" />
+            <Tooltip title={t('details.viewDetails')}>
+              <IconButton size="small" color="primary" onClick={() => openDetailsDialog(alert)}>
+                <DetailsIcon fontSize="small" />
               </IconButton>
             </Tooltip>
           </TableCell>
@@ -1151,17 +1212,42 @@ export default function AlertsPage() {
                     </TableCell>
                     {visibleColumnDefs.map((col) => renderCell(col, alert))}
                     <TableCell>
-                      <Tooltip title={t('actionDialog.title')}>
-                        <IconButton
-                          size="small"
-                          color="primary"
-                          onClick={() =>
-                            setActionDialog({ open: true, alert })
-                          }
-                        >
-                          <SendIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
+                      <Box display="flex" alignItems="center" sx={{ whiteSpace: 'nowrap' }}>
+                        <Tooltip title={t('retriggerValidations.tooltip')}>
+                          <span>
+                            <IconButton
+                              size="small"
+                              color="secondary"
+                              disabled={retriggeringValidations.has(alert.id)}
+                              onClick={() => handleRetriggerValidations(alert)}
+                            >
+                              {retriggeringValidations.has(alert.id) ? (
+                                <SyncIcon
+                                  fontSize="small"
+                                  sx={{
+                                    animation: 'spin 1s linear infinite',
+                                    '@keyframes spin': {
+                                      '0%': { transform: 'rotate(0deg)' },
+                                      '100%': { transform: 'rotate(360deg)' },
+                                    },
+                                  }}
+                                />
+                              ) : (
+                                <RetriggerIcon fontSize="small" />
+                              )}
+                            </IconButton>
+                          </span>
+                        </Tooltip>
+                        <Tooltip title={t('actionDialog.title')}>
+                          <IconButton
+                            size="small"
+                            color="primary"
+                            onClick={() => setActionDialog({ open: true, alert })}
+                          >
+                            <SendIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      </Box>
                     </TableCell>
                   </TableRow>
                 ))
@@ -1341,22 +1427,64 @@ export default function AlertsPage() {
         </DialogActions>
       </Dialog>
 
-      {/* History Dialog: timeline of audit events for the alert */}
+      {/* Details Dialog: all field values + timeline of audit events */}
       <Dialog
-        open={historyDialog.open}
-        onClose={closeHistoryDialog}
-        maxWidth="sm"
+        open={detailsDialog.open}
+        onClose={closeDetailsDialog}
+        maxWidth="md"
         fullWidth
       >
         <DialogTitle>
-          {t('history.dialogTitle')}
-          {historyDialog.alert && (
+          {t('details.dialogTitle')}
+          {detailsDialog.alert && (
             <Typography variant="body2" color="text.secondary" component="div">
-              {historyDialog.alert.alert_id}
+              {detailsDialog.alert.alert_id}
             </Typography>
           )}
         </DialogTitle>
-        <DialogContent>
+        <DialogContent dividers>
+          {detailsDialog.alert && (
+            <>
+              <Typography variant="subtitle1" fontWeight={600} mb={1}>
+                {t('details.fieldsTitle')}
+              </Typography>
+              <Box sx={{ mb: 2 }}>
+                {[
+                  { label: t('columns.alertId'), value: detailsDialog.alert.alert_id },
+                  { label: t('columns.alertTimestamp'), value: detailsDialog.alert.alert_timestamp ? dayjs(detailsDialog.alert.alert_timestamp).format('YYYY-MM-DD HH:mm') : '-' },
+                  { label: t('columns.status'), value: tc(`statuses.${detailsDialog.alert.status}`) },
+                  { label: t('columns.errorCode'), value: detailsDialog.alert.error_code || '-' },
+                  { label: t('columns.targetMarket'), value: detailsDialog.alert.target_market },
+                  { label: t('columns.alertMessage'), value: detailsDialog.alert.alert_message || '-' },
+                  { label: t('columns.gtin'), value: detailsDialog.alert.gtin || '-' },
+                  { label: t('columns.batchName'), value: detailsDialog.alert.batch_name || '-' },
+                  { label: t('columns.serialNumber'), value: detailsDialog.alert.serial_number || '-' },
+                  { label: t('columns.expiryDate'), value: detailsDialog.alert.expiry_date ? dayjs(detailsDialog.alert.expiry_date).format('YYYY-MM-DD') : '-' },
+                  { label: t('columns.messageGUID'), value: detailsDialog.alert.message_guid || '-' },
+                  { label: t('actionDialog.validationStatus'), value: detailsDialog.alert.ValidationStatus || '-' },
+                  { label: t('columns.rootCause'), value: detailsDialog.alert.root_cause || '-' },
+                  { label: t('columns.assignedUser'), value: detailsDialog.alert.assigned_user ? resolveUserName(detailsDialog.alert.assigned_user) : t('history.unassigned') },
+                  { label: tc('createdOn'), value: detailsDialog.alert.created_on ? dayjs(detailsDialog.alert.created_on).format('YYYY-MM-DD HH:mm') : '-' },
+                  { label: tc('changedOn'), value: detailsDialog.alert.changed_on ? dayjs(detailsDialog.alert.changed_on).format('YYYY-MM-DD HH:mm') : '-' },
+                ].map((f) => (
+                  <Box
+                    key={f.label}
+                    sx={{ display: 'flex', gap: 1, py: 0.5, borderBottom: '1px solid', borderColor: 'divider' }}
+                  >
+                    <Typography variant="caption" color="text.secondary" sx={{ minWidth: 150, flexShrink: 0, pt: '2px' }}>
+                      {f.label}
+                    </Typography>
+                    <Typography variant="body2" sx={{ wordBreak: 'break-word' }}>
+                      {f.value}
+                    </Typography>
+                  </Box>
+                ))}
+              </Box>
+              <Typography variant="subtitle1" fontWeight={600} mb={1}>
+                {t('details.historyTitle')}
+              </Typography>
+            </>
+          )}
           {isLoadingHistory ? (
             <Box sx={{ py: 3 }}>
               <LinearProgress />
@@ -1419,7 +1547,7 @@ export default function AlertsPage() {
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={closeHistoryDialog}>{tc('close')}</Button>
+          <Button onClick={closeDetailsDialog}>{tc('close')}</Button>
         </DialogActions>
       </Dialog>
 

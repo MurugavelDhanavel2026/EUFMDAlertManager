@@ -17,7 +17,19 @@
     "messageGUID": "Message GUID",
     "rootCause": "Root Cause / Comments",
     "assignedUser": "Assigned User",
-    "history": "History"
+    "details": "Details"
+  },
+  "details": {
+    "viewDetails": "View details",
+    "dialogTitle": "Alert Details",
+    "fieldsTitle": "Field Values",
+    "historyTitle": "History"
+  },
+  "retriggerValidations": {
+    "tooltip": "Retrigger all validations",
+    "notConfigured": "UiPath Maestro (retrigger validations) is not configured or disabled. Please set up in Admin settings.",
+    "success": "Validations retrigger workflow started successfully.",
+    "error": "Failed to retrigger validations."
   },
   "columnsConfig": {
     "tooltip": "Configure columns",
@@ -68,8 +80,6 @@
   "masterDataTriggered": "Master data reporting automation triggered successfully.",
   "masterDataTriggerError": "Failed to trigger master data reporting automation.",
   "history": {
-    "viewHistory": "View History",
-    "dialogTitle": "Alert History",
     "empty": "No history events recorded for this alert.",
     "system": "System",
     "unassigned": "Unassigned",
@@ -81,7 +91,8 @@
       "root_cause_updated": "Root cause updated",
       "user_assigned": "User assigned",
       "nmvs_response_sent": "NMVS response sent",
-      "master_data_triggered": "Master data reporting triggered"
+      "master_data_triggered": "Master data reporting triggered",
+      "validations_retriggered": "Validations retriggered"
     },
     "descriptions": {
       "created": "Alert was inserted with initial status \"{{status}}\".",
@@ -89,7 +100,8 @@
       "rootCauseUpdated": "New value: \"{{value}}\".",
       "userAssigned": "Assigned to {{user}}.",
       "nmvsSent": "Response email sent to {{recipient}}.",
-      "masterDataTriggered": "UiPath automation triggered with GTIN {{gtin}}."
+      "masterDataTriggered": "UiPath automation triggered with GTIN {{gtin}}.",
+      "validationsRetriggered": "Maestro workflow started with EPC {{epc}}."
     }
   },
   "uipathNotConfigured": "UiPath is not configured or disabled. Please set up in Admin settings.",
