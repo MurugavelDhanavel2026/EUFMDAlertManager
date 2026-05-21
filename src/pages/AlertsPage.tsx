@@ -3,7 +3,6 @@ import {
   Box,
   Typography,
   Card,
-  CardContent,
   Table,
   TableBody,
   TableCell,
@@ -25,7 +24,6 @@ import {
   Select,
   FormControl,
   InputLabel,
-  Grid,
   Paper,
   LinearProgress,
   Divider,
@@ -37,7 +35,6 @@ import {
   Refresh as RefreshIcon,
   Send as SendIcon,
   CloudDownload as FetchIcon,
-  Psychology as RootCauseIcon,
   Save as SaveIcon,
   Sync as SyncIcon,
   PlayArrow as TriggerIcon,
@@ -63,7 +60,7 @@ import type { UserPreferences } from '../types/preferences';
 import dayjs from 'dayjs';
 
 // How a column can be filtered. 'none' => no funnel shown for that column.
-type ColumnFilterKind = 'text' | 'status' | 'user' | 'date' | 'none';
+type ColumnFilterKind = 'text' | 'status' | 'user' | 'date' | 'market' | 'none';
 
 interface AlertColumnDef {
   key: string;
@@ -77,12 +74,13 @@ interface AlertColumnDef {
 
 // The full, ordered list of configurable Alerts-table columns. The selection
 // checkbox (first) and the Actions column (last) are fixed and intentionally
-// NOT part of this list. The Target Market column has been removed from display.
+// NOT part of this list.
 const ALERT_COLUMNS: AlertColumnDef[] = [
   { key: 'alert_id', ns: 'alerts', labelKey: 'columns.alertId', filter: 'text', dbColumn: 'alert_id' },
   { key: 'alert_timestamp', ns: 'alerts', labelKey: 'columns.alertTimestamp', filter: 'date', dbColumn: 'alert_timestamp' },
   { key: 'status', ns: 'alerts', labelKey: 'columns.status', filter: 'status', dbColumn: 'status' },
   { key: 'error_code', ns: 'alerts', labelKey: 'columns.errorCode', filter: 'text', dbColumn: 'error_code' },
+  { key: 'target_market', ns: 'alerts', labelKey: 'columns.targetMarket', filter: 'market', dbColumn: 'target_market' },
   { key: 'alert_message', ns: 'alerts', labelKey: 'columns.alertMessage', filter: 'text', dbColumn: 'alert_message' },
   { key: 'gtin', ns: 'alerts', labelKey: 'columns.gtin', filter: 'text', dbColumn: 'gtin' },
   { key: 'batch_name', ns: 'alerts', labelKey: 'columns.batchName', filter: 'text', dbColumn: 'batch_name' },
@@ -112,7 +110,6 @@ export default function AlertsPage() {
   const [isFetching, setIsFetching] = useState(false);
 
   // Filters
-  const [filterMarket, setFilterMarket] = useState('');
   const [markets, setMarkets] = useState<{ market_code: string; market_name: string }[]>([]);
   const [availableUsers, setAvailableUsers] = useState<User[]>([]);
 
@@ -223,9 +220,6 @@ export default function AlertsPage() {
         .order('created_on', { ascending: false })
         .range(page * pageSize, (page + 1) * pageSize - 1);
 
-      // Market scope filter (kept at the top of the page for supervisors/admins).
-      if (filterMarket) query = query.eq('target_market', filterMarket);
-
       // Per-column filters applied server-side so they span all pages.
       for (const col of ALERT_COLUMNS) {
         if (!col.dbColumn) continue;
@@ -237,6 +231,7 @@ export default function AlertsPage() {
             break;
           case 'status':
           case 'user':
+          case 'market':
             query = query.eq(col.dbColumn, value);
             break;
           case 'date': {
@@ -259,7 +254,7 @@ export default function AlertsPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [page, pageSize, columnFilters, filterMarket, enqueueSnackbar, t]);
+  }, [page, pageSize, columnFilters, enqueueSnackbar, t]);
 
   useEffect(() => {
     fetchAlerts();
@@ -910,6 +905,12 @@ export default function AlertsPage() {
         );
       case 'error_code':
         return <TableCell key={col.key}>{alert.error_code || '-'}</TableCell>;
+      case 'target_market':
+        return (
+          <TableCell key={col.key}>
+            <Chip label={alert.target_market} size="small" variant="outlined" />
+          </TableCell>
+        );
       case 'alert_message':
         return (
           <TableCell key={col.key} sx={{ fontSize: '0.8rem', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -1040,22 +1041,6 @@ export default function AlertsPage() {
           >
             {isFetching ? t('fetchingAlerts') : t('fetchAlerts')}
           </Button>
-          <Button
-            variant="outlined"
-            startIcon={<RootCauseIcon />}
-            onClick={async () => {
-              try {
-                await supabase.functions.invoke('trigger-uipath', {
-                  body: { action: 'root_cause_analysis' },
-                });
-                enqueueSnackbar(t('rootCauseSuccess'), { variant: 'info' });
-              } catch {
-                enqueueSnackbar(t('rootCauseError'), { variant: 'error' });
-              }
-            }}
-          >
-            {t('rootCauseAnalysis')}
-          </Button>
           <Tooltip title={t('columnsConfig.tooltip')}>
             <IconButton onClick={(e) => setColumnsMenuAnchor(e.currentTarget)} color="primary">
               <ColumnsIcon />
@@ -1066,34 +1051,6 @@ export default function AlertsPage() {
           </IconButton>
         </Box>
       </Box>
-
-      {/* Market scope filter — column-level filters live in the table headers.
-          The Target Market column itself is no longer displayed in the table. */}
-      {!isAlertHandler && (
-        <Card sx={{ mb: 2 }}>
-          <CardContent sx={{ py: 1.5 }}>
-            <Grid container spacing={2} alignItems="center">
-              <Grid size={{ xs: 12, sm: 4, md: 3 }}>
-                <TextField
-                  select
-                  fullWidth
-                  size="small"
-                  label={t('columns.targetMarket')}
-                  value={filterMarket}
-                  onChange={(e) => { setFilterMarket(e.target.value); setPage(0); }}
-                >
-                  <MenuItem value="">All Markets</MenuItem>
-                  {markets.map((m) => (
-                    <MenuItem key={m.market_code} value={m.market_code}>
-                      {m.market_name} ({m.market_code})
-                    </MenuItem>
-                  ))}
-                </TextField>
-              </Grid>
-            </Grid>
-          </CardContent>
-        </Card>
-      )}
 
       {/* Bulk Actions */}
       {selected.size > 0 && (
@@ -1536,6 +1493,25 @@ export default function AlertsPage() {
                     {availableUsers.map((u) => (
                       <MenuItem key={u.id} value={u.id}>
                         {u.display_name || u.username}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              )}
+
+              {col.filter === 'market' && (
+                <FormControl fullWidth size="small">
+                  <Select
+                    value={filterDraft}
+                    displayEmpty
+                    onChange={(e) => setFilterDraft(e.target.value)}
+                  >
+                    <MenuItem value="">
+                      <em>{t('filter.all')}</em>
+                    </MenuItem>
+                    {markets.map((m) => (
+                      <MenuItem key={m.market_code} value={m.market_code}>
+                        {m.market_name} ({m.market_code})
                       </MenuItem>
                     ))}
                   </Select>

@@ -42,15 +42,6 @@ interface UiPathFetchConfig {
   enabled: boolean;
 }
 
-interface UiPathConfig {
-  base_url: string;
-  client_id: string;
-  client_secret: string;
-  release_key: string;
-  folder_id: string;
-  enabled: boolean;
-}
-
 interface DbConfig {
   supabase_url: string;
   supabase_anon_key: string;
@@ -128,15 +119,6 @@ export default function AdminPage() {
     enabled: false,
   });
 
-  const [uipathRootCause, setUipathRootCause] = useState<UiPathConfig>({
-    base_url: '',
-    client_id: '',
-    client_secret: '',
-    release_key: '',
-    folder_id: '',
-    enabled: false,
-  });
-
   const [dbConfig, setDbConfig] = useState<DbConfig>({
     supabase_url: '',
     supabase_anon_key: '',
@@ -161,9 +143,6 @@ export default function AdminPage() {
               break;
             case 'uipath_master_data_reporting':
               setUipathMasterData(row.value as UiPathFetchConfig);
-              break;
-            case 'uipath_root_cause':
-              setUipathRootCause(row.value as UiPathConfig);
               break;
             case 'db_config':
               setDbConfig(row.value as DbConfig);
@@ -530,97 +509,6 @@ export default function AdminPage() {
           </Card>
         </Grid>
 
-        {/* UiPath Root Cause */}
-        <Grid size={{ xs: 12, md: 6 }}>
-          <Card>
-            <CardHeader
-              title={`${t('uipathConfig.title')} - Root Cause Analysis`}
-              subheader="Configure UiPath Orchestrator API for root cause analysis"
-            />
-            <Divider />
-            <CardContent>
-              <Alert severity="info" sx={{ mb: 2 }}>
-                Register an External Application in UiPath Automation Cloud with <strong>OR.Jobs</strong> and <strong>OR.Execution</strong> scopes.
-              </Alert>
-              <TextField
-                fullWidth
-                size="small"
-                label={t('uipathConfig.baseUrl')}
-                value={uipathRootCause.base_url}
-                onChange={(e) => setUipathRootCause((p) => ({ ...p, base_url: e.target.value }))}
-                placeholder="https://cloud.uipath.com/orgName/tenantName"
-                helperText="Your UiPath Automation Cloud base URL"
-                sx={{ mb: 2 }}
-              />
-              <TextField
-                fullWidth
-                size="small"
-                label={t('uipathConfig.clientId')}
-                value={uipathRootCause.client_id}
-                onChange={(e) => setUipathRootCause((p) => ({ ...p, client_id: e.target.value }))}
-                placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-                sx={{ mb: 2 }}
-              />
-              <TextField
-                fullWidth
-                size="small"
-                label={t('uipathConfig.clientSecret')}
-                type="password"
-                value={uipathRootCause.client_secret}
-                onChange={(e) => setUipathRootCause((p) => ({ ...p, client_secret: e.target.value }))}
-                sx={{ mb: 2 }}
-              />
-              <TextField
-                fullWidth
-                size="small"
-                label={t('uipathConfig.releaseKey')}
-                value={uipathRootCause.release_key}
-                onChange={(e) => setUipathRootCause((p) => ({ ...p, release_key: e.target.value }))}
-                placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-                helperText="Process release key from Orchestrator"
-                sx={{ mb: 2 }}
-              />
-              <TextField
-                fullWidth
-                size="small"
-                label={t('uipathConfig.folderId')}
-                value={uipathRootCause.folder_id}
-                onChange={(e) => setUipathRootCause((p) => ({ ...p, folder_id: e.target.value }))}
-                placeholder="123456"
-                helperText="Organization Unit / Folder ID"
-                sx={{ mb: 2 }}
-              />
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={uipathRootCause.enabled}
-                    onChange={(e) =>
-                      setUipathRootCause((p) => ({ ...p, enabled: e.target.checked }))
-                    }
-                  />
-                }
-                label={t('uipathConfig.enabled')}
-                sx={{ mb: 2 }}
-              />
-              <Box>
-                <Button
-                  variant="contained"
-                  startIcon={<SaveIcon />}
-                  onClick={() =>
-                    saveSetting(
-                      'uipath_root_cause',
-                      uipathRootCause,
-                      t('uipathConfig.success'),
-                      t('uipathConfig.error')
-                    )
-                  }
-                >
-                  {t('uipathConfig.save')}
-                </Button>
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
       </Grid>
     </Box>
   );

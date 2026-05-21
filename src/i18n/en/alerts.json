@@ -3,7 +3,6 @@
   "fetchAlerts": "Fetch Alerts",
   "fetchingAlerts": "Fetching alerts...",
   "respondNMVS": "Respond to NMVS",
-  "rootCauseAnalysis": "Run Root Cause Analysis",
   "columns": {
     "alertId": "Alert ID",
     "alertTimestamp": "Timestamp",
@@ -99,7 +98,5 @@
   "fetchSuccess": "Alerts fetched successfully",
   "fetchError": "Failed to fetch alerts",
   "updateSuccess": "Alert updated successfully",
-  "updateError": "Failed to update alert",
-  "rootCauseSuccess": "Root cause analysis triggered",
-  "rootCauseError": "Failed to trigger root cause analysis"
+  "updateError": "Failed to update alert"
 }

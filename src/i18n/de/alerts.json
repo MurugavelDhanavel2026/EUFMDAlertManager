@@ -3,7 +3,6 @@
   "fetchAlerts": "Alarme abrufen",
   "fetchingAlerts": "Alarme werden abgerufen...",
   "respondNMVS": "An NMVS antworten",
-  "rootCauseAnalysis": "Ursachenanalyse starten",
   "columns": {
     "alertId": "Alarm-ID",
     "alertTimestamp": "Zeitstempel",
@@ -99,7 +98,5 @@
   "fetchSuccess": "Alarme erfolgreich abgerufen",
   "fetchError": "Alarme konnten nicht abgerufen werden",
   "updateSuccess": "Alarm erfolgreich aktualisiert",
-  "updateError": "Alarm konnte nicht aktualisiert werden",
-  "rootCauseSuccess": "Ursachenanalyse gestartet",
-  "rootCauseError": "Ursachenanalyse konnte nicht gestartet werden"
+  "updateError": "Alarm konnte nicht aktualisiert werden"
 }
