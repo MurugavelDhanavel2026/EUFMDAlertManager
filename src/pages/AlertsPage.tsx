@@ -23,7 +23,6 @@ import {
   DialogActions,
   Select,
   FormControl,
-  InputLabel,
   Paper,
   LinearProgress,
   Divider,
@@ -913,8 +912,12 @@ export default function AlertsPage() {
         );
       case 'alert_message':
         return (
-          <TableCell key={col.key} sx={{ fontSize: '0.8rem', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            {alert.alert_message || '-'}
+          <TableCell key={col.key} sx={{ fontSize: '0.8rem', maxWidth: 180 }}>
+            <Tooltip title={alert.alert_message || ''} placement="top-start">
+              <Box sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {alert.alert_message || '-'}
+              </Box>
+            </Tooltip>
           </TableCell>
         );
       case 'gtin':
@@ -940,7 +943,7 @@ export default function AlertsPage() {
               <TextField
                 size="small"
                 multiline
-                maxRows={3}
+                maxRows={2}
                 value={
                   editingRootCause[alert.id] !== undefined
                     ? editingRootCause[alert.id]
@@ -953,7 +956,7 @@ export default function AlertsPage() {
                   }))
                 }
                 placeholder={t('columns.rootCause')}
-                sx={{ minWidth: 200 }}
+                sx={{ minWidth: 150, '& .MuiInputBase-input': { fontSize: '0.8rem' } }}
               />
               {editingRootCause[alert.id] !== undefined && (
                 <Tooltip title={tc('save')}>
@@ -968,12 +971,12 @@ export default function AlertsPage() {
       case 'assigned_user':
         return (
           <TableCell key={col.key}>
-            <FormControl size="small" sx={{ minWidth: 130 }}>
-              <InputLabel>{t('columns.assignedUser')}</InputLabel>
+            <FormControl size="small" sx={{ minWidth: 120 }}>
               <Select
                 value={alert.assigned_user || ''}
-                label={t('columns.assignedUser')}
+                displayEmpty
                 onChange={(e) => handleAssignedUserChange(alert.id, e.target.value)}
+                sx={{ fontSize: '0.8rem' }}
               >
                 <MenuItem value="">
                   <em>None</em>
@@ -1016,14 +1019,16 @@ export default function AlertsPage() {
 
   return (
     <Box>
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3} flexWrap="wrap" gap={1}>
-        <Typography variant="h4">{t('title')}</Typography>
-        <Box display="flex" gap={1}>
+      <Box display="flex" justifyContent="space-between" alignItems="center" mb={1.5} flexWrap="wrap" gap={1}>
+        <Typography variant="h5">{t('title')}</Typography>
+        <Box display="flex" alignItems="center" gap={0.5}>
           <Button
             variant="contained"
+            size="small"
             startIcon={
               isFetching ? (
                 <SyncIcon
+                  fontSize="small"
                   sx={{
                     animation: 'spin 1s linear infinite',
                     '@keyframes spin': {
@@ -1033,7 +1038,7 @@ export default function AlertsPage() {
                   }}
                 />
               ) : (
-                <FetchIcon />
+                <FetchIcon fontSize="small" />
               )
             }
             onClick={handleFetchAlerts}
@@ -1042,13 +1047,15 @@ export default function AlertsPage() {
             {isFetching ? t('fetchingAlerts') : t('fetchAlerts')}
           </Button>
           <Tooltip title={t('columnsConfig.tooltip')}>
-            <IconButton onClick={(e) => setColumnsMenuAnchor(e.currentTarget)} color="primary">
-              <ColumnsIcon />
+            <IconButton size="small" onClick={(e) => setColumnsMenuAnchor(e.currentTarget)} color="primary">
+              <ColumnsIcon fontSize="small" />
             </IconButton>
           </Tooltip>
-          <IconButton onClick={fetchAlerts} color="primary">
-            <RefreshIcon />
-          </IconButton>
+          <Tooltip title={tc('refresh')}>
+            <IconButton size="small" onClick={fetchAlerts} color="primary">
+              <RefreshIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
         </Box>
       </Box>
 
@@ -1091,8 +1098,8 @@ export default function AlertsPage() {
       {/* Alerts Table */}
       <Card>
         {(isLoading || isFetching) && <LinearProgress />}
-        <TableContainer sx={{ maxHeight: 'calc(100vh - 320px)' }}>
-          <Table stickyHeader size="small">
+        <TableContainer sx={{ maxHeight: 'calc(100vh - 240px)' }}>
+          <Table stickyHeader size="small" sx={{ '& .MuiTableCell-root': { py: 0.5 } }}>
             <TableHead>
               <TableRow>
                 <TableCell padding="checkbox">
@@ -1105,7 +1112,7 @@ export default function AlertsPage() {
                 {visibleColumnDefs.map((col) => {
                   const hasFilter = Boolean(columnFilters[col.key]);
                   return (
-                    <TableCell key={col.key} sx={col.key === 'root_cause' ? { minWidth: 250 } : undefined}>
+                    <TableCell key={col.key} sx={col.key === 'root_cause' ? { minWidth: 160 } : undefined}>
                       <Box display="flex" alignItems="center" gap={0.5} sx={{ whiteSpace: 'nowrap' }}>
                         <span>{columnLabel(col)}</span>
                         {col.filter !== 'none' && (
