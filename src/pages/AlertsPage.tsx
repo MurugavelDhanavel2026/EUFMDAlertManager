@@ -197,17 +197,37 @@ export default function AlertsPage() {
       }
 
       // Load this user's saved column visibility preference. Keep only keys
-      // that still exist and re-order them canonically (matching ALERT_COLUMNS).
+      // that still exist, re-order them canonically (matching ALERT_COLUMNS),
+      // and auto-show any column introduced AFTER the user last saved (i.e. not
+      // in their "known columns") so new features like the Details column don't
+      // stay hidden. Columns they deliberately hid (present in known, absent in
+      // visible) remain hidden.
       if (user?.id) {
         const { data: prefRow } = await supabase
           .from('user_preferences')
           .select('preferences')
           .eq('user_id', user.id)
           .maybeSingle();
-        const saved = (prefRow?.preferences as UserPreferences | null)?.alertsColumns;
+        const prefs = prefRow?.preferences as UserPreferences | null;
+        const saved = prefs?.alertsColumns;
         if (Array.isArray(saved) && saved.length > 0) {
-          const valid = ALERT_COLUMNS.filter((c) => saved.includes(c.key)).map((c) => c.key);
-          if (valid.length > 0) setVisibleColumns(valid);
+          // Legacy prefs have no alertsKnownColumns — treat the saved visible
+          // list as the known set so columns added since then are surfaced.
+          const known = new Set(
+            Array.isArray(prefs?.alertsKnownColumns) && prefs.alertsKnownColumns.length > 0
+              ? prefs.alertsKnownColumns
+              : saved
+          );
+          const visibleSet = new Set(saved);
+          const next = ALERT_COLUMNS.filter(
+            (c) => visibleSet.has(c.key) || !known.has(c.key)
+          ).map((c) => c.key);
+          if (next.length > 0) {
+            setVisibleColumns(next);
+            // Self-heal: if new columns were merged in, persist the reconciled
+            // selection (with an up-to-date known set) so it sticks.
+            if (next.length !== saved.length) void persistVisibleColumns(next);
+          }
         }
       }
     };
@@ -866,7 +886,12 @@ export default function AlertsPage() {
       await supabase.from('user_preferences').upsert(
         {
           user_id: user.id,
-          preferences: { alertsColumns: cols } satisfies UserPreferences,
+          // Record the full set of columns that exist now, so a later release
+          // that adds a column can detect it as new and surface it by default.
+          preferences: {
+            alertsColumns: cols,
+            alertsKnownColumns: DEFAULT_VISIBLE_COLUMNS,
+          } satisfies UserPreferences,
           updated_at: new Date().toISOString(),
         },
         { onConflict: 'user_id' }
