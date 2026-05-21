@@ -29,6 +29,9 @@ import {
   Paper,
   LinearProgress,
   Divider,
+  Menu,
+  Popover,
+  ListItemText,
 } from '@mui/material';
 import {
   Refresh as RefreshIcon,
@@ -45,6 +48,9 @@ import {
   PersonAdd as AssignIcon,
   MailOutline as MailSentIcon,
   BoltOutlined as TriggeredIcon,
+  ViewColumn as ColumnsIcon,
+  FilterList as FilterIcon,
+  FilterAlt as FilterActiveIcon,
 } from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
 import { useSnackbar } from 'notistack';
@@ -53,7 +59,44 @@ import { supabase } from '../config/supabase';
 import { ALERT_STATUSES, PAGE_SIZE_OPTIONS, DEFAULT_PAGE_SIZE } from '../config/constants';
 import type { Alert, AlertHistoryEvent, AlertHistoryEventType } from '../types/alert';
 import type { User } from '../types/user';
+import type { UserPreferences } from '../types/preferences';
 import dayjs from 'dayjs';
+
+// How a column can be filtered. 'none' => no funnel shown for that column.
+type ColumnFilterKind = 'text' | 'status' | 'user' | 'date' | 'none';
+
+interface AlertColumnDef {
+  key: string;
+  // Translation namespace for the column label: 'alerts' uses t(), 'common' uses tc().
+  ns: 'alerts' | 'common';
+  labelKey: string;
+  filter: ColumnFilterKind;
+  // Supabase column used for server-side filtering (omitted for non-filterable columns).
+  dbColumn?: string;
+}
+
+// The full, ordered list of configurable Alerts-table columns. The selection
+// checkbox (first) and the Actions column (last) are fixed and intentionally
+// NOT part of this list. The Target Market column has been removed from display.
+const ALERT_COLUMNS: AlertColumnDef[] = [
+  { key: 'alert_id', ns: 'alerts', labelKey: 'columns.alertId', filter: 'text', dbColumn: 'alert_id' },
+  { key: 'alert_timestamp', ns: 'alerts', labelKey: 'columns.alertTimestamp', filter: 'date', dbColumn: 'alert_timestamp' },
+  { key: 'status', ns: 'alerts', labelKey: 'columns.status', filter: 'status', dbColumn: 'status' },
+  { key: 'error_code', ns: 'alerts', labelKey: 'columns.errorCode', filter: 'text', dbColumn: 'error_code' },
+  { key: 'alert_message', ns: 'alerts', labelKey: 'columns.alertMessage', filter: 'text', dbColumn: 'alert_message' },
+  { key: 'gtin', ns: 'alerts', labelKey: 'columns.gtin', filter: 'text', dbColumn: 'gtin' },
+  { key: 'batch_name', ns: 'alerts', labelKey: 'columns.batchName', filter: 'text', dbColumn: 'batch_name' },
+  { key: 'serial_number', ns: 'alerts', labelKey: 'columns.serialNumber', filter: 'text', dbColumn: 'serial_number' },
+  { key: 'expiry_date', ns: 'alerts', labelKey: 'columns.expiryDate', filter: 'date', dbColumn: 'expiry_date' },
+  { key: 'root_cause', ns: 'alerts', labelKey: 'columns.rootCause', filter: 'text', dbColumn: 'root_cause' },
+  { key: 'assigned_user', ns: 'alerts', labelKey: 'columns.assignedUser', filter: 'user', dbColumn: 'assigned_user' },
+  { key: 'created_on', ns: 'common', labelKey: 'createdOn', filter: 'date', dbColumn: 'created_on' },
+  { key: 'changed_on', ns: 'common', labelKey: 'changedOn', filter: 'date', dbColumn: 'changed_on' },
+  { key: 'history', ns: 'alerts', labelKey: 'columns.history', filter: 'none' },
+];
+
+// By default every column is visible (in canonical order above).
+const DEFAULT_VISIBLE_COLUMNS = ALERT_COLUMNS.map((c) => c.key);
 
 export default function AlertsPage() {
   const { t } = useTranslation('alerts');
@@ -69,10 +112,20 @@ export default function AlertsPage() {
   const [isFetching, setIsFetching] = useState(false);
 
   // Filters
-  const [filterStatus, setFilterStatus] = useState('');
   const [filterMarket, setFilterMarket] = useState('');
   const [markets, setMarkets] = useState<{ market_code: string; market_name: string }[]>([]);
   const [availableUsers, setAvailableUsers] = useState<User[]>([]);
+
+  // Per-column server-side filters, keyed by column key.
+  const [columnFilters, setColumnFilters] = useState<Record<string, string>>({});
+
+  // Funnel popover state: which column's filter editor is open + its draft value.
+  const [filterPopover, setFilterPopover] = useState<{ key: string; anchor: HTMLElement } | null>(null);
+  const [filterDraft, setFilterDraft] = useState('');
+
+  // Column visibility (per-user, persisted in the user_preferences table).
+  const [visibleColumns, setVisibleColumns] = useState<string[]>(DEFAULT_VISIBLE_COLUMNS);
+  const [columnsMenuAnchor, setColumnsMenuAnchor] = useState<HTMLElement | null>(null);
 
   // Selection
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -141,6 +194,21 @@ export default function AlertsPage() {
           if (row.key === 'uipath_master_data_reporting') setUipathMasterDataConfig(row.value as { invoke_url: string; personal_access_token: string; enabled: boolean });
         }
       }
+
+      // Load this user's saved column visibility preference. Keep only keys
+      // that still exist and re-order them canonically (matching ALERT_COLUMNS).
+      if (user?.id) {
+        const { data: prefRow } = await supabase
+          .from('user_preferences')
+          .select('preferences')
+          .eq('user_id', user.id)
+          .maybeSingle();
+        const saved = (prefRow?.preferences as UserPreferences | null)?.alertsColumns;
+        if (Array.isArray(saved) && saved.length > 0) {
+          const valid = ALERT_COLUMNS.filter((c) => saved.includes(c.key)).map((c) => c.key);
+          if (valid.length > 0) setVisibleColumns(valid);
+        }
+      }
     };
     load();
   }, [user, isAlertHandler]);
@@ -155,8 +223,31 @@ export default function AlertsPage() {
         .order('created_on', { ascending: false })
         .range(page * pageSize, (page + 1) * pageSize - 1);
 
-      if (filterStatus) query = query.eq('status', filterStatus);
+      // Market scope filter (kept at the top of the page for supervisors/admins).
       if (filterMarket) query = query.eq('target_market', filterMarket);
+
+      // Per-column filters applied server-side so they span all pages.
+      for (const col of ALERT_COLUMNS) {
+        if (!col.dbColumn) continue;
+        const value = (columnFilters[col.key] ?? '').trim();
+        if (!value) continue;
+        switch (col.filter) {
+          case 'text':
+            query = query.ilike(col.dbColumn, `%${value}%`);
+            break;
+          case 'status':
+          case 'user':
+            query = query.eq(col.dbColumn, value);
+            break;
+          case 'date': {
+            // Match the whole calendar day, works for both date and timestamptz columns.
+            const start = value;
+            const end = dayjs(value).add(1, 'day').format('YYYY-MM-DD');
+            query = query.gte(col.dbColumn, start).lt(col.dbColumn, end);
+            break;
+          }
+        }
+      }
 
       const { data, count, error } = await query;
       if (error) throw error;
@@ -168,7 +259,7 @@ export default function AlertsPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [page, pageSize, filterStatus, filterMarket, enqueueSnackbar, t]);
+  }, [page, pageSize, columnFilters, filterMarket, enqueueSnackbar, t]);
 
   useEffect(() => {
     fetchAlerts();
@@ -708,6 +799,220 @@ export default function AlertsPage() {
     }
   };
 
+  // ---- Column visibility (Task 1) ----
+  const columnLabel = (col: AlertColumnDef): string =>
+    col.ns === 'common' ? tc(col.labelKey) : t(col.labelKey);
+
+  const visibleColumnDefs = ALERT_COLUMNS.filter((c) => visibleColumns.includes(c.key));
+
+  const persistVisibleColumns = async (cols: string[]) => {
+    if (!user?.id) return;
+    try {
+      await supabase.from('user_preferences').upsert(
+        {
+          user_id: user.id,
+          preferences: { alertsColumns: cols } satisfies UserPreferences,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'user_id' }
+      );
+    } catch (err) {
+      console.error('Failed to save column preferences:', err);
+    }
+  };
+
+  const toggleColumn = (key: string) => {
+    setVisibleColumns((prev) => {
+      const next = prev.includes(key)
+        ? prev.filter((k) => k !== key)
+        : ALERT_COLUMNS.filter((c) => prev.includes(c.key) || c.key === key).map((c) => c.key);
+      void persistVisibleColumns(next);
+      return next;
+    });
+  };
+
+  const resetColumns = () => {
+    setVisibleColumns(DEFAULT_VISIBLE_COLUMNS);
+    void persistVisibleColumns(DEFAULT_VISIBLE_COLUMNS);
+    setColumnsMenuAnchor(null);
+  };
+
+  // ---- Per-column filters (Task 3) ----
+  const openFilter = (key: string, anchor: HTMLElement) => {
+    setFilterDraft(columnFilters[key] ?? '');
+    setFilterPopover({ key, anchor });
+  };
+
+  const closeFilter = () => setFilterPopover(null);
+
+  const commitFilter = (key: string, value: string) => {
+    setColumnFilters((prev) => {
+      const next = { ...prev };
+      if (value.trim()) next[key] = value.trim();
+      else delete next[key];
+      return next;
+    });
+    setPage(0);
+  };
+
+  const applyFilter = () => {
+    if (!filterPopover) return;
+    commitFilter(filterPopover.key, filterDraft);
+    closeFilter();
+  };
+
+  const clearFilter = (key: string) => {
+    commitFilter(key, '');
+    setFilterDraft('');
+    closeFilter();
+  };
+
+  // Renders the body cell for a given column. Keeps the original per-column
+  // markup/styling so behaviour is unchanged; only ordering/visibility is
+  // now driven by the column config.
+  const renderCell = (col: AlertColumnDef, alert: Alert) => {
+    switch (col.key) {
+      case 'alert_id':
+        return (
+          <TableCell key={col.key} sx={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>
+            {alert.alert_id}
+          </TableCell>
+        );
+      case 'alert_timestamp':
+        return (
+          <TableCell key={col.key} sx={{ fontSize: '0.8rem', whiteSpace: 'nowrap' }}>
+            {alert.alert_timestamp ? dayjs(alert.alert_timestamp).format('YYYY-MM-DD HH:mm') : '-'}
+          </TableCell>
+        );
+      case 'status':
+        return (
+          <TableCell key={col.key}>
+            <FormControl size="small" sx={{ minWidth: 120 }}>
+              <Select
+                value={alert.status}
+                onChange={(e) => handleStatusChange(alert.id, e.target.value)}
+                renderValue={(val) => (
+                  <Chip
+                    label={tc(`statuses.${val}`)}
+                    size="small"
+                    color={getStatusColor(val as string) as 'warning' | 'info' | 'success' | 'default'}
+                  />
+                )}
+              >
+                {ALERT_STATUSES.map((s) => (
+                  <MenuItem key={s} value={s}>
+                    {tc(`statuses.${s}`)}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </TableCell>
+        );
+      case 'error_code':
+        return <TableCell key={col.key}>{alert.error_code || '-'}</TableCell>;
+      case 'alert_message':
+        return (
+          <TableCell key={col.key} sx={{ fontSize: '0.8rem', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {alert.alert_message || '-'}
+          </TableCell>
+        );
+      case 'gtin':
+        return (
+          <TableCell key={col.key} sx={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>
+            {alert.gtin || '-'}
+          </TableCell>
+        );
+      case 'batch_name':
+        return <TableCell key={col.key}>{alert.batch_name || '-'}</TableCell>;
+      case 'serial_number':
+        return <TableCell key={col.key} sx={{ fontSize: '0.8rem' }}>{alert.serial_number || '-'}</TableCell>;
+      case 'expiry_date':
+        return (
+          <TableCell key={col.key} sx={{ fontSize: '0.8rem' }}>
+            {alert.expiry_date ? dayjs(alert.expiry_date).format('YYYY-MM-DD') : '-'}
+          </TableCell>
+        );
+      case 'root_cause':
+        return (
+          <TableCell key={col.key}>
+            <Box display="flex" alignItems="center" gap={0.5}>
+              <TextField
+                size="small"
+                multiline
+                maxRows={3}
+                value={
+                  editingRootCause[alert.id] !== undefined
+                    ? editingRootCause[alert.id]
+                    : alert.root_cause || ''
+                }
+                onChange={(e) =>
+                  setEditingRootCause((prev) => ({
+                    ...prev,
+                    [alert.id]: e.target.value,
+                  }))
+                }
+                placeholder={t('columns.rootCause')}
+                sx={{ minWidth: 200 }}
+              />
+              {editingRootCause[alert.id] !== undefined && (
+                <Tooltip title={tc('save')}>
+                  <IconButton size="small" color="primary" onClick={() => handleRootCauseSave(alert.id)}>
+                    <SaveIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              )}
+            </Box>
+          </TableCell>
+        );
+      case 'assigned_user':
+        return (
+          <TableCell key={col.key}>
+            <FormControl size="small" sx={{ minWidth: 130 }}>
+              <InputLabel>{t('columns.assignedUser')}</InputLabel>
+              <Select
+                value={alert.assigned_user || ''}
+                label={t('columns.assignedUser')}
+                onChange={(e) => handleAssignedUserChange(alert.id, e.target.value)}
+              >
+                <MenuItem value="">
+                  <em>None</em>
+                </MenuItem>
+                {availableUsers.map((u) => (
+                  <MenuItem key={u.id} value={u.id}>
+                    {u.display_name || u.username}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </TableCell>
+        );
+      case 'created_on':
+        return (
+          <TableCell key={col.key} sx={{ fontSize: '0.8rem', whiteSpace: 'nowrap' }}>
+            {alert.created_on ? dayjs(alert.created_on).format('YYYY-MM-DD HH:mm') : '-'}
+          </TableCell>
+        );
+      case 'changed_on':
+        return (
+          <TableCell key={col.key} sx={{ fontSize: '0.8rem', whiteSpace: 'nowrap' }}>
+            {alert.changed_on ? dayjs(alert.changed_on).format('YYYY-MM-DD HH:mm') : '-'}
+          </TableCell>
+        );
+      case 'history':
+        return (
+          <TableCell key={col.key}>
+            <Tooltip title={t('history.viewHistory')}>
+              <IconButton size="small" color="primary" onClick={() => openHistoryDialog(alert)}>
+                <HistoryIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          </TableCell>
+        );
+      default:
+        return null;
+    }
+  };
+
   return (
     <Box>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3} flexWrap="wrap" gap={1}>
@@ -751,17 +1056,23 @@ export default function AlertsPage() {
           >
             {t('rootCauseAnalysis')}
           </Button>
+          <Tooltip title={t('columnsConfig.tooltip')}>
+            <IconButton onClick={(e) => setColumnsMenuAnchor(e.currentTarget)} color="primary">
+              <ColumnsIcon />
+            </IconButton>
+          </Tooltip>
           <IconButton onClick={fetchAlerts} color="primary">
             <RefreshIcon />
           </IconButton>
         </Box>
       </Box>
 
-      {/* Filters */}
-      <Card sx={{ mb: 2 }}>
-        <CardContent sx={{ py: 1.5 }}>
-          <Grid container spacing={2} alignItems="center">
-            {!isAlertHandler && (
+      {/* Market scope filter — column-level filters live in the table headers.
+          The Target Market column itself is no longer displayed in the table. */}
+      {!isAlertHandler && (
+        <Card sx={{ mb: 2 }}>
+          <CardContent sx={{ py: 1.5 }}>
+            <Grid container spacing={2} alignItems="center">
               <Grid size={{ xs: 12, sm: 4, md: 3 }}>
                 <TextField
                   select
@@ -779,27 +1090,10 @@ export default function AlertsPage() {
                   ))}
                 </TextField>
               </Grid>
-            )}
-            <Grid size={{ xs: 12, sm: 4, md: 3 }}>
-              <TextField
-                select
-                fullWidth
-                size="small"
-                label={t('columns.status')}
-                value={filterStatus}
-                onChange={(e) => { setFilterStatus(e.target.value); setPage(0); }}
-              >
-                <MenuItem value="">All Statuses</MenuItem>
-                {ALERT_STATUSES.map((s) => (
-                  <MenuItem key={s} value={s}>
-                    {tc(`statuses.${s}`)}
-                  </MenuItem>
-                ))}
-              </TextField>
             </Grid>
-          </Grid>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Bulk Actions */}
       {selected.size > 0 && (
@@ -851,28 +1145,34 @@ export default function AlertsPage() {
                     onChange={(e) => handleSelectAll(e.target.checked)}
                   />
                 </TableCell>
-                <TableCell>{t('columns.alertId')}</TableCell>
-                <TableCell>{t('columns.alertTimestamp')}</TableCell>
-                <TableCell>{t('columns.status')}</TableCell>
-                <TableCell>{t('columns.errorCode')}</TableCell>
-                <TableCell>{t('columns.targetMarket')}</TableCell>
-                <TableCell>{t('columns.alertMessage')}</TableCell>
-                <TableCell>{t('columns.gtin')}</TableCell>
-                <TableCell>{t('columns.batchName')}</TableCell>
-                <TableCell>{t('columns.serialNumber')}</TableCell>
-                <TableCell>{t('columns.expiryDate')}</TableCell>
-                <TableCell sx={{ minWidth: 250 }}>{t('columns.rootCause')}</TableCell>
-                <TableCell>{t('columns.assignedUser')}</TableCell>
-                <TableCell>{tc('createdOn')}</TableCell>
-                <TableCell>{tc('changedOn')}</TableCell>
-                <TableCell>{t('columns.history')}</TableCell>
+                {visibleColumnDefs.map((col) => {
+                  const hasFilter = Boolean(columnFilters[col.key]);
+                  return (
+                    <TableCell key={col.key} sx={col.key === 'root_cause' ? { minWidth: 250 } : undefined}>
+                      <Box display="flex" alignItems="center" gap={0.5} sx={{ whiteSpace: 'nowrap' }}>
+                        <span>{columnLabel(col)}</span>
+                        {col.filter !== 'none' && (
+                          <Tooltip title={hasFilter ? t('filter.active') : t('filter.tooltip')}>
+                            <IconButton
+                              size="small"
+                              color={hasFilter ? 'primary' : 'default'}
+                              onClick={(e) => openFilter(col.key, e.currentTarget)}
+                            >
+                              {hasFilter ? <FilterActiveIcon fontSize="inherit" /> : <FilterIcon fontSize="inherit" />}
+                            </IconButton>
+                          </Tooltip>
+                        )}
+                      </Box>
+                    </TableCell>
+                  );
+                })}
                 <TableCell>{tc('actions')}</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {alerts.length === 0 && !isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={17} align="center" sx={{ py: 4 }}>
+                  <TableCell colSpan={visibleColumnDefs.length + 2} align="center" sx={{ py: 4 }}>
                     <Typography color="text.secondary">{tc('noData')}</Typography>
                   </TableCell>
                 </TableRow>
@@ -885,123 +1185,7 @@ export default function AlertsPage() {
                         onChange={(e) => handleSelect(alert.id, e.target.checked)}
                       />
                     </TableCell>
-                    <TableCell sx={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>
-                      {alert.alert_id}
-                    </TableCell>
-                    <TableCell sx={{ fontSize: '0.8rem', whiteSpace: 'nowrap' }}>
-                      {alert.alert_timestamp
-                        ? dayjs(alert.alert_timestamp).format('YYYY-MM-DD HH:mm')
-                        : '-'}
-                    </TableCell>
-                    <TableCell>
-                      <FormControl size="small" sx={{ minWidth: 120 }}>
-                        <Select
-                          value={alert.status}
-                          onChange={(e) => handleStatusChange(alert.id, e.target.value)}
-                          renderValue={(val) => (
-                            <Chip
-                              label={tc(`statuses.${val}`)}
-                              size="small"
-                              color={getStatusColor(val as string) as 'warning' | 'info' | 'success' | 'default'}
-                            />
-                          )}
-                        >
-                          {ALERT_STATUSES.map((s) => (
-                            <MenuItem key={s} value={s}>
-                              {tc(`statuses.${s}`)}
-                            </MenuItem>
-                          ))}
-                        </Select>
-                      </FormControl>
-                    </TableCell>
-                    <TableCell>{alert.error_code || '-'}</TableCell>
-                    <TableCell>
-                      <Chip label={alert.target_market} size="small" variant="outlined" />
-                    </TableCell>
-                    <TableCell sx={{ fontSize: '0.8rem', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {alert.alert_message || '-'}
-                    </TableCell>
-                    <TableCell sx={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>
-                      {alert.gtin || '-'}
-                    </TableCell>
-                    <TableCell>{alert.batch_name || '-'}</TableCell>
-                    <TableCell sx={{ fontSize: '0.8rem' }}>{alert.serial_number || '-'}</TableCell>
-                    <TableCell sx={{ fontSize: '0.8rem' }}>
-                      {alert.expiry_date ? dayjs(alert.expiry_date).format('YYYY-MM-DD') : '-'}
-                    </TableCell>
-                    <TableCell>
-                      <Box display="flex" alignItems="center" gap={0.5}>
-                        <TextField
-                          size="small"
-                          multiline
-                          maxRows={3}
-                          value={
-                            editingRootCause[alert.id] !== undefined
-                              ? editingRootCause[alert.id]
-                              : alert.root_cause || ''
-                          }
-                          onChange={(e) =>
-                            setEditingRootCause((prev) => ({
-                              ...prev,
-                              [alert.id]: e.target.value,
-                            }))
-                          }
-                          placeholder={t('columns.rootCause')}
-                          sx={{ minWidth: 200 }}
-                        />
-                        {editingRootCause[alert.id] !== undefined && (
-                          <Tooltip title={tc('save')}>
-                            <IconButton
-                              size="small"
-                              color="primary"
-                              onClick={() => handleRootCauseSave(alert.id)}
-                            >
-                              <SaveIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                        )}
-                      </Box>
-                    </TableCell>
-                    <TableCell>
-                      <FormControl size="small" sx={{ minWidth: 130 }}>
-                        <InputLabel>{t('columns.assignedUser')}</InputLabel>
-                        <Select
-                          value={alert.assigned_user || ''}
-                          label={t('columns.assignedUser')}
-                          onChange={(e) => handleAssignedUserChange(alert.id, e.target.value)}
-                        >
-                          <MenuItem value="">
-                            <em>None</em>
-                          </MenuItem>
-                          {availableUsers.map((u) => (
-                            <MenuItem key={u.id} value={u.id}>
-                              {u.display_name || u.username}
-                            </MenuItem>
-                          ))}
-                        </Select>
-                      </FormControl>
-                    </TableCell>
-                    <TableCell sx={{ fontSize: '0.8rem', whiteSpace: 'nowrap' }}>
-                      {alert.created_on
-                        ? dayjs(alert.created_on).format('YYYY-MM-DD HH:mm')
-                        : '-'}
-                    </TableCell>
-                    <TableCell sx={{ fontSize: '0.8rem', whiteSpace: 'nowrap' }}>
-                      {alert.changed_on
-                        ? dayjs(alert.changed_on).format('YYYY-MM-DD HH:mm')
-                        : '-'}
-                    </TableCell>
-                    <TableCell>
-                      <Tooltip title={t('history.viewHistory')}>
-                        <IconButton
-                          size="small"
-                          color="primary"
-                          onClick={() => openHistoryDialog(alert)}
-                        >
-                          <HistoryIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                    </TableCell>
+                    {visibleColumnDefs.map((col) => renderCell(col, alert))}
                     <TableCell>
                       <Tooltip title={t('actionDialog.title')}>
                         <IconButton
@@ -1274,6 +1458,130 @@ export default function AlertsPage() {
           <Button onClick={closeHistoryDialog}>{tc('close')}</Button>
         </DialogActions>
       </Dialog>
+
+      {/* Column visibility menu (Task 1) */}
+      <Menu
+        anchorEl={columnsMenuAnchor}
+        open={Boolean(columnsMenuAnchor)}
+        onClose={() => setColumnsMenuAnchor(null)}
+      >
+        <Typography variant="subtitle2" sx={{ px: 2, py: 1 }}>
+          {t('columnsConfig.title')}
+        </Typography>
+        <Divider />
+        {ALERT_COLUMNS.map((col) => (
+          <MenuItem key={col.key} dense onClick={() => toggleColumn(col.key)}>
+            <Checkbox
+              edge="start"
+              size="small"
+              checked={visibleColumns.includes(col.key)}
+              tabIndex={-1}
+              disableRipple
+            />
+            <ListItemText primary={columnLabel(col)} />
+          </MenuItem>
+        ))}
+        <Divider />
+        <MenuItem dense onClick={resetColumns}>
+          {t('columnsConfig.reset')}
+        </MenuItem>
+      </Menu>
+
+      {/* Per-column filter popover (Task 3) */}
+      <Popover
+        open={Boolean(filterPopover)}
+        anchorEl={filterPopover?.anchor ?? null}
+        onClose={closeFilter}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+      >
+        {filterPopover && (() => {
+          const col = ALERT_COLUMNS.find((c) => c.key === filterPopover.key);
+          if (!col) return null;
+          const hasActiveFilter = Boolean(columnFilters[col.key]);
+          return (
+            <Box sx={{ p: 2, width: 260 }}>
+              <Typography variant="subtitle2" gutterBottom>
+                {t('filter.title', { field: columnLabel(col) })}
+              </Typography>
+
+              {col.filter === 'status' && (
+                <FormControl fullWidth size="small">
+                  <Select
+                    value={filterDraft}
+                    displayEmpty
+                    onChange={(e) => setFilterDraft(e.target.value)}
+                  >
+                    <MenuItem value="">
+                      <em>{t('filter.all')}</em>
+                    </MenuItem>
+                    {ALERT_STATUSES.map((s) => (
+                      <MenuItem key={s} value={s}>
+                        {tc(`statuses.${s}`)}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              )}
+
+              {col.filter === 'user' && (
+                <FormControl fullWidth size="small">
+                  <Select
+                    value={filterDraft}
+                    displayEmpty
+                    onChange={(e) => setFilterDraft(e.target.value)}
+                  >
+                    <MenuItem value="">
+                      <em>{t('filter.all')}</em>
+                    </MenuItem>
+                    {availableUsers.map((u) => (
+                      <MenuItem key={u.id} value={u.id}>
+                        {u.display_name || u.username}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              )}
+
+              {col.filter === 'date' && (
+                <TextField
+                  fullWidth
+                  size="small"
+                  type="date"
+                  value={filterDraft}
+                  onChange={(e) => setFilterDraft(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') applyFilter(); }}
+                  slotProps={{ inputLabel: { shrink: true } }}
+                />
+              )}
+
+              {col.filter === 'text' && (
+                <TextField
+                  fullWidth
+                  size="small"
+                  autoFocus
+                  value={filterDraft}
+                  placeholder={t('filter.contains')}
+                  onChange={(e) => setFilterDraft(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') applyFilter(); }}
+                />
+              )}
+
+              <Box display="flex" justifyContent="space-between" mt={2}>
+                <Button
+                  size="small"
+                  onClick={() => clearFilter(col.key)}
+                  disabled={!hasActiveFilter && !filterDraft}
+                >
+                  {t('filter.clear')}
+                </Button>
+                <Button size="small" variant="contained" onClick={applyFilter}>
+                  {t('filter.apply')}
+                </Button>
+              </Box>
+            </Box>
+          );
+        })()}
+      </Popover>
     </Box>
   );
 }

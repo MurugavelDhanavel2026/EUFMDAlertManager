@@ -20,6 +20,20 @@
     "assignedUser": "Zugewiesener Benutzer",
     "history": "Verlauf"
   },
+  "columnsConfig": {
+    "tooltip": "Spalten konfigurieren",
+    "title": "Spalten anzeigen",
+    "reset": "Auf Standard zurücksetzen"
+  },
+  "filter": {
+    "title": "Filter: {{field}}",
+    "tooltip": "Diese Spalte filtern",
+    "active": "Filter aktiv – zum Bearbeiten klicken",
+    "contains": "Enthält…",
+    "all": "Alle",
+    "apply": "Anwenden",
+    "clear": "Löschen"
+  },
   "bulk": {
     "selected": "{{count}} ausgewählt",
     "closeSelected": "Auswahl schließen",

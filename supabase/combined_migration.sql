@@ -376,6 +376,40 @@ REVOKE ALL ON FUNCTION public.get_user_display_map(UUID[]) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.get_user_display_map(UUID[]) TO authenticated;
 
 -- ============================================
+-- 10. USER PREFERENCES (per-user UI settings)
+-- ============================================
+-- One row per user holding a free-form JSONB blob keyed by preference area
+-- (e.g. which columns are visible on the Alerts page).
+CREATE TABLE IF NOT EXISTS public.user_preferences (
+  user_id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  preferences JSONB NOT NULL DEFAULT '{}',
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+ALTER TABLE public.user_preferences ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "user_preferences_select" ON public.user_preferences;
+CREATE POLICY "user_preferences_select" ON public.user_preferences
+  FOR SELECT TO authenticated
+  USING (user_id = auth.uid());
+
+DROP POLICY IF EXISTS "user_preferences_insert" ON public.user_preferences;
+CREATE POLICY "user_preferences_insert" ON public.user_preferences
+  FOR INSERT TO authenticated
+  WITH CHECK (user_id = auth.uid());
+
+DROP POLICY IF EXISTS "user_preferences_update" ON public.user_preferences;
+CREATE POLICY "user_preferences_update" ON public.user_preferences
+  FOR UPDATE TO authenticated
+  USING (user_id = auth.uid())
+  WITH CHECK (user_id = auth.uid());
+
+DROP POLICY IF EXISTS "user_preferences_delete" ON public.user_preferences;
+CREATE POLICY "user_preferences_delete" ON public.user_preferences
+  FOR DELETE TO authenticated
+  USING (user_id = auth.uid());
+
+-- ============================================
 -- DONE! All tables, indexes, functions, triggers,
 -- RLS policies, and seed data created.
 -- ============================================

@@ -20,6 +20,20 @@
     "assignedUser": "Assigned User",
     "history": "History"
   },
+  "columnsConfig": {
+    "tooltip": "Configure columns",
+    "title": "Show columns",
+    "reset": "Reset to default"
+  },
+  "filter": {
+    "title": "Filter: {{field}}",
+    "tooltip": "Filter this column",
+    "active": "Filter active — click to edit",
+    "contains": "Contains…",
+    "all": "All",
+    "apply": "Apply",
+    "clear": "Clear"
+  },
   "bulk": {
     "selected": "{{count}} selected",
     "closeSelected": "Close Selected",
