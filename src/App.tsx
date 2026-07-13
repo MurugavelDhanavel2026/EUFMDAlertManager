@@ -2,6 +2,7 @@ import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { SnackbarProvider } from 'notistack';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 import { AuthProvider } from './contexts/AuthContext';
 import AppRouter from './router';
 import theme from './config/theme';
@@ -30,6 +31,7 @@ export default function App() {
           </AuthProvider>
         </SnackbarProvider>
       </QueryClientProvider>
+      <SpeedInsights />
     </ThemeProvider>
   );
 }
